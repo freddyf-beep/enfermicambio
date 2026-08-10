@@ -54,3 +54,11 @@ Status: IN PROGRESS - code foundation verified locally; device evidence pending.
 - Aggregation currently sums sample records with proportional overlap handling; real-device validation of platform aggregation (no double counting of phone + wearable overlap) is outstanding.
 - `app_config.competition_timezone` is seeded as `UTC` (provisional); set the group timezone before real competitions.
 - No Supabase project provisioned: upsert persistence is code-tested but not integration-tested against Postgres.
+
+## Phase 1 schema progress (2026-08-10)
+
+- Migration `20260810231207_full_schema` applied to the remote project: `workouts`, `workout_route_points`, `foods`, `food_entries`, `posts`, `post_media`, `comments`, `reactions`, `achievements`, `user_achievements`, `streaks`, `missions`, `mission_progress`, `seasons`, `season_points`, `season_results`, `season_standings` view, plus RLS policies, grants, indexes, and four private storage buckets.
+- RLS verified: anonymous REST to `workouts` and `season_standings` returns `401`; private buckets are not listable anonymously.
+- `competition_timezone` updated to `America/Santiago` in `app_config` (matches the client default).
+- Five-tab app shell (`HOY`, `RANKING`, `REGISTRAR`, `JUEGO`, `NOSOTROS`) and shared UI states implemented and covered by widget tests.
+- RLS integration test matrix (1.13) still requires a local Supabase stack / service role + four real users; the four-user provisioning procedure is documented in `supabase/docs/four-user-provisioning.md`.
