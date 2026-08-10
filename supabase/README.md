@@ -15,6 +15,8 @@ This directory contains the database foundation for the four-user private fitnes
 - a database trigger that prevents more than four profile rows;
 - RLS policies and grants for allowlisted reads and owner-scoped writes.
 
+**Status: applied to the remote project (ref `bweynxdzovnbcjwgddar`, region `us-east-2`, 2026-08-10).** The migration was applied and recorded in `supabase_migrations.schema_migrations` as `20260810000001`; `supabase migration list` reports local and remote in sync.
+
 The migration does not seed real users. Provision exactly four `auth.users` identities, then insert the matching four `profiles` rows with the service role or another trusted administrative path. The `profiles.id` value must equal the corresponding `auth.users.id`.
 
 ## Configuration

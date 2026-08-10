@@ -22,6 +22,13 @@ Status: IN PROGRESS - code foundation verified locally; device evidence pending.
 - `flutter build apk --debug`: built successfully (`build\app\outputs\flutter-apk\app-debug.apk`).
   - `minSdk = 26` set for the `health` plugin requirement.
 
+## Remote verification (run 2026-08-10)
+
+- Migration `0001_phase0_foundation.sql` applied to the remote Supabase project (`bweynxdzovnbcjwgddar`, region `us-east-2`) and recorded as `20260810000001` in `supabase_migrations.schema_migrations`.
+- `supabase migration list`: local and remote in sync; `db push --dry-run` reports "up to date".
+- Tables created: `app_config`, `profiles`, `daily_activity`. `app_config` seeded with the Phase 0 defaults (windows, timezone provisional UTC, point values, goals, cooldown).
+- Anonymous REST requests to `app_config`, `profiles`, `daily_activity` return `401`, confirming RLS blocks unauthenticated access as designed.
+
 ## Environment status
 
 - Flutter 3.44.9 stable, Dart 3.12.2, Android SDK 36.1.0 present.

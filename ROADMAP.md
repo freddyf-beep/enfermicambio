@@ -38,7 +38,7 @@ Goal: prove the single hardest dependency (automatic step reads on both platform
 - [x] 0.6 Filter out records the platform flags as manually entered; log the filter decision with source metadata for diagnostics. Unit tested.
 - [ ] 0.7 Use platform aggregation APIs (not naive raw-record summation) so phone + wearable overlap does not double count. Document the aggregation strategy per platform.
 - [x] 0.8 Split accepted steps into `morning_steps` (06:00-12:00), `afternoon_steps` (12:00-18:00), `night_steps` (18:00-24:00), `daily_steps` using `competition_timezone`, with window boundaries read from config. Unit tested at boundaries.
-- [~] 0.9 Create the `daily_activity` table (migration 0001) with `unique(user_id, date)` and upsert one aggregate row per user per day. Migration written; not yet applied (no Supabase CLI/Postgres locally).
+- [x] 0.9 Create the `daily_activity` table (migration 0001) with `unique(user_id, date)` and upsert one aggregate row per user per day. Applied to remote project `bweynxdzovnbcjwgddar` (2026-08-10); `db push --dry-run` up to date. See `docs/checkpoint-0.md`.
 - [x] 0.10 Store diagnostic source metadata (`platform`, `source_app`, `source_device`, `recording_method`, `manual_entry_detected`) in a side table or JSONB column, kept out of the normal UI. In migration 0001 and the sync pipeline.
 - [ ] 0.11 Validation day: on each device, record the platform health app's displayed total, the app's accepted total, known manual entries, and the delta. Any material discrepancy is investigated and explained in the checkpoint note.
 - [x] 0.12 Show visible states: syncing, success with `last_synced`, permission denied, health service unavailable, no data. Implemented in the spike screen.
