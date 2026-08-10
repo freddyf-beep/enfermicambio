@@ -2,44 +2,39 @@
 
 The app allowlist is exactly four `auth.users` + four `profiles` rows. This document describes the provisioning procedure. Credentials and access tokens are never committed to the repository.
 
+## Auth model
+
+Supabase Auth with Google sign-in as the primary identity provider. There is no public registration. Exactly four allowlisted users exist; anyone else is rejected at the RLS layer (`is_allowlisted_user()`).
+
+Provisioning is manual and uses the service role key. When a user signs in with Google for the first time, Supabase links the Google identity to the existing `auth.users` row by email. No extra `profiles` row is created automatically.
+
 ## Prerequisites
 
-- A linked Supabase project (`supabase link --project-ref <ref>`).
-- A Supabase access token (`SUPABASE_ACCESS_TOKEN`) for the admin API.
-- The service role key for the project (Settings -> API -> service_role, kept out of source control).
+- A linked Supabase project (`supabase link --project-ref bweynxdzovnbcjwgddar`).
+- Google OAuth credentials configured in Supabase Auth -> Providers -> Google (client ID + secret from Google Cloud Console).
+- The service role key for the project (Settings -> API -> service_role), kept out of source control.
 
 ## Procedure
 
-1. Collect the four email addresses and temporary passwords. Use real, owned addresses so users can sign in.
+1. Collect the four email addresses. Decide each user's `display_name`.
 
-2. Create the four auth users through the admin API:
+2. Run the provisioning script for each user (set `SERVICE_ROLE_KEY` first):
 
    ```powershell
-   $anon = "YOUR_ANON_KEY"
-   $body = @{ email = "person1@example.com"; password = "temporary-password" } | ConvertTo-Json
-   Invoke-RestMethod -Uri "https://<ref>.supabase.co/auth/v1/admin/users" `
-     -Method Post -Headers @{ apikey = $anon; Authorization = "Bearer $SERVICE_ROLE_KEY"; "Content-Type" = "application/json" } `
-     -Body $body
+   $env:SERVICE_ROLE_KEY = "eyJ..."
+   node supabase/scripts/provision_user.js "person@example.com" "temporary-password" "DisplayName"
    ```
 
-3. The response returns each user's `id` UUID. Insert the matching four `profiles` rows with the service role via the PostgREST admin path, or with a trusted SQL connection:
+   The script creates the `auth.users` row (email confirmed, no email verification required), then the matching `profiles` row with the same UUID, `platform=unknown`, `timezone=America/Santiago`, and the default targets.
 
-   ```sql
-   insert into public.profiles (id, display_name, platform, timezone, daily_calorie_target, daily_step_target)
-   values
-     ('<user-uuid-1>', 'Diego', 'unknown', 'America/Santiago', 2200, 10000),
-     ('<user-uuid-2>', 'Nico', 'unknown', 'America/Santiago', 2200, 10000),
-     ('<user-uuid-3>', 'Pedro', 'unknown', 'America/Santiago', 2200, 10000),
-     ('<user-uuid-4>', 'Juan', 'unknown', 'America/Santiago', 2200, 10000);
-   ```
+3. After provisioning, each user signs in with Google. Supabase links the Google identity to the existing account by email.
 
-   The `profiles.id` must equal the corresponding `auth.users.id`. The four-user cap trigger rejects a fifth row.
-
-4. Reset each temporary password or have each user set their own via the app's password flow.
+4. The user changes their real name and any settings in the `NOSOTROS` tab.
 
 ## Verification
 
 - `auth.users` count is exactly four and `profiles` count is exactly four.
-- A fifth `profiles` insert raises the cap exception.
-- Each user can sign in and read `app_config`, all profiles, and shared data.
+- A fifth `profiles` insert raises the cap exception (`public.enforce_four_profile_cap()`).
+- Each user signs in with Google and reads `app_config`, all profiles, and shared data.
 - Anonymous REST requests to `app_config`, `profiles`, and `daily_activity` return `401`.
+- An authenticated user without a `profiles` row reads nothing.
