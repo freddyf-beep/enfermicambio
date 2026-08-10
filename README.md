@@ -1,260 +1,118 @@
 # Enfermicambio
 
-Enfermicambio is a private fitness and social competition app for exactly four known friends. It turns automatically recorded movement and manually logged nutrition into shared rankings, workouts, missions, streaks, trophies, achievements, seasons, and a private activity feed.
+A private fitness and social competition app for exactly four friends, running on two iPhones and two Android phones. Real-world movement and nutrition become the input to a private game: rankings, missions, streaks, trophies, achievements, seasons, and a shared activity feed.
 
-This repository currently contains the product specification and implementation documentation. The application is complete only when the implementation satisfies the acceptance criteria in `SPECS.md` and the release gate in `ROADMAP.md`.
+This repository currently contains the product specification and delivery plan. The app is complete only when the acceptance criteria in `SPECS.md` and the release gate in `ROADMAP.md` pass on all four devices.
 
-## Product Definition
+## What the Finished Product Looks Like
 
-The finished app is intended for two iPhones and two Android phones:
+### First run
 
-- HealthKit supplies iOS activity data.
-- Health Connect supplies Android activity data.
-- Supabase provides authentication, PostgreSQL, Realtime, private storage, and server-side jobs.
-- Flutter provides the mobile application and shared feature code.
+A new user opens the app and signs in with their pre-created account. There is no registration form; the four accounts already exist. A short onboarding explains that steps and workouts are read automatically from Apple Health or Health Connect, that manually entered steps do not count, and that the other three members can see shared fitness stats. The user connects their health source, sets a daily calorie target and step target, and lands on `HOY`.
 
-The app is intentionally small and private. It is not a public social network, commercial SaaS product, marketplace, coaching service, or multi-tenant platform.
+### HOY (home)
 
-## Core Behavior
+The default screen. At the top, a personal summary for today:
 
-### Private four-user access
+```text
+8,420 steps   510 active kcal   1 workout   1,540 / 2,200 kcal
+```
 
-- Exactly four accounts are pre-created or allowlisted.
-- There is no public registration, group creation, discovery, followers, billing, advertising, or public profile.
-- All four users can read the shared fitness statistics and private feed.
-- Each user can modify only their own profile, health-derived records, nutrition entries, workouts, and manual posts according to the access rules.
+Below it, the current four-person ranking, always showing all four users, each with a `last synced` indicator:
 
-### Automatic activity
+```text
+1. Diego   9,800    synced 2 min ago
+2. Nico    8,950    synced 5 min ago
+3. Pedro   8,420    synced 1 min ago
+4. Juan    7,310    stale - last sync 3 h ago
+```
 
-- Steps are read from Apple HealthKit or Android Health Connect.
-- The app has no manual step-entry UI.
-- Step samples marked as manually entered are rejected when the platform exposes that metadata.
-- Phone and wearable sources are handled with platform aggregation and de-duplication behavior where possible.
-- Daily steps are split into configurable morning, afternoon, night, and total windows.
-- All rounds and season cutoffs use one shared `competition_timezone`, not each device's local timezone.
-- The UI exposes a `last synced` timestamp and distinguishes stale, missing, denied, and unavailable data.
+The rest of the screen is the shared private timeline: automatic events (step milestones, round results, overtake alerts, achievements) mixed with manual posts (photos, meals, workouts, routes). A user can react with an emoji or leave a comment on anything.
 
-### Competition
+### RANKING
 
-The app provides:
+A segmented control switches between `Today`, `Week`, and `Season`. A category selector offers steps, rounds, distance, workouts, calories, nutrition, and game points. Every view shows all four users, including users with no data yet, clearly marked. Morning, afternoon, night, and full-day step rankings are first-class views.
 
-- morning, afternoon, night, and full-day rankings;
-- today, week, and season statistics;
-- active calories, distance, workouts, exercise minutes, nutrition, and game points;
-- configurable points for ranks, round wins, step goals, workouts, calorie targets, and missions;
-- personal improvement ranking as an optional fairness feature.
+### REGISTRAR
 
-Game points are not raw step totals. They are awarded by validated rules and recorded in an immutable season ledger.
+The action tab for nutrition and social content: scan a barcode, search food, photograph a meal, create a meal, write a post, attach a location, share a workout. There is deliberately no way to enter steps.
 
-### Workouts and routes
+Scanning a barcode resolves the product through Open Food Facts, falling back to the group's private cache, then to USDA, then to a create-once custom food that all four users can reuse. The user picks a serving, assigns it to breakfast, lunch, dinner, snack, or other, and saves. The meal summary shows consumed, target, and remaining calories plus macro totals.
 
-Workouts may be imported automatically from HealthKit or Health Connect. A workout can include type, start/end time, duration, distance, active calories, pace/speed, source, and route availability.
+### JUEGO
 
-When route data exists, the finished app renders it in workout detail and may show a compact route preview in the feed. Route sharing is explicit. There is no live location tracking, navigation, or turn-by-turn directions.
+The game screen: current season standings, today's missions, active streaks, the achievement collection, the trophy cabinet, and season history with past champions.
 
-### Nutrition
+Points are not raw steps. Daily rank pays 10/7/4/2, each round win pays +3, hitting the step goal pays +2, a workout pays +3, staying within the calorie target pays +2, missions pay variable rewards. All values are server-configurable. Points are recorded in an append-only ledger; standings are derived from it.
 
-Users can log breakfast, lunch, dinner, snacks, and other meals. Nutrition supports:
+Seasons run monthly. At season end the backend freezes standings, crowns a champion, publishes the result to the feed, and starts the next season at zero. Historical stats never reset.
 
-- calorie targets and optional protein, carbohydrate, and fat targets;
-- barcode scanning for EAN/UPC products;
-- Open Food Facts as the primary lookup source;
-- USDA FoodData Central as a fallback;
-- a private four-user food cache;
-- custom foods and quantities;
-- meal photos;
-- optional meal posts.
+### NOSOTROS
 
-For the MVP, `within_calorie_target` means consumed calories are less than or equal to the configured daily target. The app must not describe consumed calories minus exercise calories as a real metabolic deficit without a separate validated model.
+The four profiles: avatar, season rank, today's steps, current streaks, workouts and distance this week, season points, trophies, and lifetime stats (steps, distance, workouts, daily wins, round wins, season wins, longest streaks).
 
-### Social feed
+### A day in the feed
 
-The private feed combines manual posts and automatic events. Supported content includes text, photos, meals, workouts, routes, achievements, step milestones, ranking changes, round results, missions, and seasons.
+```text
+08:34  Diego finished a run - 6.2 km, 36 min
+09:01  Nico reached 5,000 steps
+11:58  Pedro won the morning round
+13:12  Juan logged lunch - 712 kcal [photo]
+16:21  Diego reached 10,000 steps
+18:00  Diego won the afternoon round
+19:42  Pedro finished a workout - 58 min
+21:04  Nico passed Diego by 214 steps
+00:00  Daily result: Diego takes the day
+```
 
-Users can:
-
-- add captions and optional explicit post locations;
-- react once per emoji per post;
-- add flat comments;
-- delete their own comments;
-- publish meals, workouts, routes, and achievements intentionally.
-
-Automatic feed events are rate-limited so leader changes do not overwhelm the timeline.
-
-### Game layer
-
-The game screen contains the current season, standings, missions, streaks, achievements, trophies, and season history. The rules are configurable and include individual, competitive, and cooperative missions.
-
-At the end of a season, the backend freezes standings, stores final positions, awards the champion trophy, publishes the result, and starts a new season with zero points. Historical activity and trophies remain available.
+Leader-change events are rate-limited so the feed stays fun instead of noisy.
 
 ## Architecture
 
 ```text
-Flutter mobile app
+Flutter app (iOS + Android)
+  |-- feature modules: auth, profiles, health, activity, ranking,
+  |                    nutrition, workouts, feed, game, notifications
+  |-- Apple HealthKit (iOS) / Health Connect (Android)
+  |-- Flutter health abstraction plugin, native channels only for gaps
   |
-  +-- Feature modules
-  |     +-- Auth and profiles
-  |     +-- Health sync
-  |     +-- Activity and rankings
-  |     +-- Nutrition
-  |     +-- Workouts and routes
-  |     +-- Feed and notifications
-  |     +-- Missions, achievements, streaks, seasons
-  |
-  +-- Platform health APIs
-  |     +-- Apple HealthKit
-  |     +-- Android Health Connect
-  |
-  +-- Supabase
-        +-- Auth
-        +-- PostgreSQL
-        +-- Row-level security
-        +-- Realtime
-        +-- Private Storage
-        +-- Edge Functions or scheduled jobs
+Supabase
+  |-- Auth (four allowlisted accounts, no public signup)
+  |-- PostgreSQL + Row Level Security on every table
+  |-- Realtime (delivery only; the database stays authoritative)
+  |-- Private Storage (avatars, feed, meal, workout media)
+  |-- Edge Functions + scheduled jobs (round closes, points, seasons)
 ```
 
-The database is authoritative. Realtime is an update mechanism, not the sole source of truth. Health aggregates are idempotent, workouts use external source IDs where available, food entries are editable records, and points are append-only ledger entries.
+Core data rules:
 
-The expected primary data model includes:
-
-- `profiles`;
-- `daily_activity`;
-- `workouts`;
-- `workout_route_points`;
-- `foods`;
-- `food_entries`;
-- `posts`;
-- `post_media`;
-- `comments`;
-- `reactions`;
-- `achievements`;
-- `user_achievements`;
-- `streaks`;
-- `missions`;
-- `mission_progress`;
-- `seasons`;
-- `season_points`;
-- `season_results`;
-- configurable app settings.
-
-## Navigation
-
-The product navigation uses these product identifiers:
-
-```text
-HOY        Personal summary, current ranking, and shared feed
-RANKING    Today, week, and season comparisons
-REGISTRAR  Nutrition, barcode, meal photos, and social actions
-JUEGO      Missions, streaks, achievements, trophies, and seasons
-NOSOTROS   The four profiles and historical shared statistics
-```
-
-The identifiers above may remain localized in the product UI. Engineering documentation, code symbols, logs, and test names remain in English.
-
-## Main Workflows
-
-### First login
-
-```text
-Login
-  ->
-Connect Health
-  ->
-Choose only the required permissions
-  ->
-Set calorie target
-  ->
-Set step target
-  ->
-Ready
-```
-
-The onboarding must explain that activity is read automatically, manual steps do not count, and the other three members can see shared fitness statistics.
-
-### Health sync
-
-```text
-Open or foreground app
-  ->
-Request or verify health permissions
-  ->
-Read accepted automatic records
-  ->
-De-duplicate and reject detectable manual entries
-  ->
-Split by competition timezone and configured windows
-  ->
-Upsert daily aggregates
-  ->
-Refresh rankings and last-synced state
-```
-
-Background refresh and platform notifications are best-effort. The product must not promise second-by-second synchronization.
-
-### Food logging
-
-```text
-Scan barcode
-  ->
-Lookup Open Food Facts
-  ->
-Fallback to USDA or private cache
-  ->
-Create custom food if missing
-  ->
-Choose serving and quantity
-  ->
-Choose meal type
-  ->
-Save nutrition snapshot
-  ->
-Optionally publish to feed
-```
-
-Search follows the same data-source priority without requiring a barcode.
-
-### Workout sharing
-
-```text
-Import workout
-  ->
-De-duplicate by source identifier
-  ->
-Show stats and route when available
-  ->
-Optionally publish a workout or route card
-```
-
-### Daily and season lifecycle
-
-At round boundaries, the backend closes the relevant window, records the winner, awards verified points, and publishes a result. At the end of the competition day it evaluates daily points, streaks, achievements, missions, historical stats, and a daily summary. At season end it freezes results, awards the champion trophy, publishes the result, and starts the next season.
+- Daily health aggregates upsert on `(user_id, date)`; re-syncing recalculates, never duplicates.
+- Workouts de-duplicate on `(source, external_id)` where available.
+- Food entries store nutrition snapshots; later source changes never rewrite history.
+- Season points are an append-only ledger, writable only by backend jobs.
+- All rounds and season cutoffs use one shared `competition_timezone`.
 
 ## Privacy and Security
 
-- Require authentication for all application data.
-- Allow only the four known identities to access the app.
-- Apply row-level security to every user-owned and shared table.
-- Keep health, nutrition, route, location, and media data private to the four users.
-- Use authenticated storage access or signed URLs; do not use public media buckets.
-- Request only permissions needed by the current feature set.
-- Request location only for explicit route or post-location actions.
-- Keep system-generated posts and game-point awards behind trusted backend validation.
-- Do not log raw health records, access tokens, or unnecessary location details.
-- Do not commit secrets. Use local configuration placeholders and deployment-managed secret storage.
+- Exactly four allowlisted identities; anyone else reads nothing.
+- RLS on every table: shared reads, owner-scoped writes, service-role-only game writes.
+- Private storage buckets with signed URLs; no public media.
+- No live location tracking. Location is attached explicitly, per post.
+- Minimal permissions, requested in context. No secrets in source control.
+
+## Technology
+
+- Flutter / Dart.
+- iOS: HealthKit. Android: Health Connect.
+- Supabase: Auth, PostgreSQL, Realtime, Storage, Edge Functions.
+- Barcode scanning: `mobile_scanner`.
+- Food data: Open Food Facts first, USDA FoodData Central fallback, private group cache.
+- Maps: `flutter_map` + OpenStreetMap, or MapLibre.
+- Push: FCM/APNs.
 
 ## Setup
 
-The implementation is expected to require:
-
-- Flutter and Dart;
-- Xcode and an Apple development environment for iOS;
-- Android Studio, Android SDK, and a Health Connect-capable Android device for Android;
-- a Supabase project;
-- configured Apple/Google authentication only if those providers are enabled;
-- device permissions for HealthKit, Health Connect, camera, media, location, and notifications only where used.
-
-The exact repository commands should be added when the project structure exists. The expected command shape is:
+The application code does not exist yet. When it does, the expected shape is:
 
 ```powershell
 flutter pub get
@@ -263,7 +121,7 @@ flutter test
 flutter run
 ```
 
-Expected backend workflow placeholders:
+Backend workflow:
 
 ```powershell
 supabase start
@@ -271,40 +129,12 @@ supabase db reset
 supabase db push
 ```
 
-Use the project's chosen Supabase CLI workflow once migrations and local configuration are present. Do not place real URLs, keys, tokens, signing credentials, or user passwords in this document or in source control.
+Configuration comes from a `.env` file based on `.env.example` (placeholders only, never committed with real values) and from the backend `app_config` table for game tuning.
 
-Before running a device build, configure the platform-specific health permissions and the app's local environment values using the repository's eventual template, such as `.env.example`. The template must contain names and safe placeholders only.
+Requirements: Flutter stable, Xcode with signing for the iPhones, Android SDK with a Health Connect-capable device, a Supabase project, and physical test devices. Health behavior cannot be fully validated on simulators.
 
 ## Development Status
 
-The implementation is not claimed to exist merely because this README describes it. The first engineering task is the cross-platform health spike described in `ROADMAP.md`: read today's automatic steps on one iPhone and one Android device, exclude detectable manual entries, split the result into configured windows, and upload idempotent aggregates to Supabase.
+Documentation only. Delivery starts with the Phase 0 cross-platform health spike in `ROADMAP.md`: one Flutter screen that reads today's automatic steps on one iPhone and one Android phone, excludes detectable manual entries, segments them into competition windows, and upserts the aggregate to Supabase. Nothing else is built until that works.
 
-The planned delivery order is:
-
-1. Health spike.
-2. Foundation, authentication, schema, and RLS.
-3. Health synchronization and rankings.
-4. Game rules, missions, streaks, achievements, and seasons.
-5. Social feed and notifications.
-6. Nutrition and barcode logging.
-7. Workouts, routes, maps, and profile history.
-8. Offline behavior, backups, hardening, and release validation.
-
-Use `ROADMAP.md` for phase checkpoints and `CODESTYLE.md` for implementation rules.
-
-## Expected MVP
-
-The MVP is complete when all four users can authenticate and use the private app with:
-
-- HealthKit and Health Connect step sync;
-- detectable manual-step rejection;
-- morning, afternoon, night, and daily rankings;
-- active calories, distance, and workout import;
-- monthly season points and a champion result;
-- private feed with automatic events, photos, comments, and reactions;
-- food logging, barcode lookup, custom food fallback, calories, and macros;
-- streaks, initial achievements, initial missions, and a season trophy;
-- route maps in workout detail when route data exists;
-- privacy, offline, error, backup, and recovery behavior that has passed the release checkpoint.
-
-The product succeeds by supporting daily use by these four people. It is intentionally personal, small, and maintainable.
+See `ROADMAP.md` for the phase plan and checkpoint log, `CODESTYLE.md` for engineering rules, and `SPECS.md` for the full product definition.

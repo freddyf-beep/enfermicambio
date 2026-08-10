@@ -1,429 +1,320 @@
-# Enfermicambio Implementation Roadmap
+<!-- Generated from SPECS.md. Work through bullets in order. Check off a bullet only when its evidence exists. Update this file at every checkpoint. -->
 
-This roadmap turns `SPECS.md` into an executable delivery sequence for a private fitness competition app for exactly four allowlisted users. The product is not considered complete until the cross-platform health-data path, data trust rules, privacy controls, and core acceptance criteria work on two iPhones and two Android devices.
+# Enfermicambio Roadmap
 
-## Delivery Rules
+Executable delivery plan for the private four-user fitness competition app described in `SPECS.md`.
 
-- Treat the four-user constraint as a product and security invariant, not a future scaling target.
-- Prove the highest-risk integration first: automatic step reads on one iPhone and one Android device, manual-entry filtering where detectable, time-window aggregation, and Supabase persistence.
-- Keep the database authoritative. Realtime updates may improve responsiveness but must not be the only source of truth.
-- Keep health-derived aggregates idempotent. Re-syncing a day must replace or recalculate that day's aggregate rather than append duplicate totals.
-- Keep game points server-verified and ledger-backed. A client must not be able to award itself points.
-- Use one configurable `competition_timezone` for round boundaries and season cutoffs.
-- Do not add public registration, user-created groups, chat, payments, ads, live location tracking, navigation, medical guidance, or enterprise-scale infrastructure.
-- At every checkpoint, record test evidence, known limitations, and the next blocking risk before advancing.
+## Non-Negotiable Invariants
+
+These apply to every phase. A phase cannot pass its checkpoint if any invariant is violated.
+
+- Exactly four allowlisted users. No public registration, group creation, discovery, payments, ads, chat, live location tracking, navigation, or medical features.
+- No manual step entry UI anywhere in the app, including shared form components.
+- Detectable manual step records are excluded from rankings, streaks, achievements, missions, and points.
+- One shared `competition_timezone` drives all round boundaries, daily cutoffs, and season cutoffs.
+- Daily health aggregates are idempotent: re-syncing a day recalculates that day's row, keyed on `(user_id, date)`.
+- Season points live in an append-only ledger. Clients never write points directly.
+- The database is authoritative. Realtime is a delivery mechanism, not the source of truth.
+- Private media uses authenticated storage access or signed URLs. No public buckets.
+- A bullet is only checked off when its acceptance evidence (test output, device logs, screenshots, or migration results) is recorded in this file or in a linked checkpoint note.
+
+## Status Legend
+
+- `[ ]` not started
+- `[~]` in progress
+- `[x]` done, with evidence recorded under the phase checkpoint
+
+---
 
 ## Phase 0 - Cross-Platform Health Spike
 
-**Goal:** Prove the hardest technical dependency before implementing the wider product.
-
-- Create the smallest Flutter app that can run on one supported iPhone and one supported Android device.
-- Evaluate the maintained Flutter health abstraction candidates from the specification against:
-  - HealthKit support;
-  - Health Connect support;
-  - interval queries;
-  - source metadata;
-  - manual-entry filtering;
-  - workouts and routes;
-  - background refresh behavior.
-- Implement permission requests for only the health data types used by the spike.
-- Read today's automatic steps on both devices.
-- Reject records marked as manual when platform metadata exposes that distinction.
-- Use platform aggregation and source de-duplication behavior where possible. Do not blindly sum phone and wearable records.
-- Split accepted steps into configurable `morning_steps`, `afternoon_steps`, `night_steps`, and `daily_steps`.
-- Upload one idempotent daily aggregate to Supabase using `(user_id, date)` uniqueness.
-- Store enough source metadata to debug discrepancies without exposing unnecessary low-level metadata in normal UI.
-- Display a visible `last_synced` timestamp.
-- Compare app totals with the device health app total for test days that include phone, wearable, and known manual records.
-
-**Dependencies**
-
-- Flutter SDK and mobile build toolchains.
-- One iPhone with HealthKit access and one Android device with Health Connect access.
-- A Supabase project with authenticated test identities.
-- A selected health abstraction package, or a documented native-channel gap.
-
-**Acceptance criteria**
-
-- The same spike build reads automatic steps on one iPhone and one Android device.
-- Manual records are excluded when the source exposes a reliable manual-entry marker.
-- The aggregate is split using the configured competition timezone and time windows.
-- Repeating the same sync does not create duplicate daily rows or inflate totals.
-- The app shows a useful sync timestamp and a useful error state for denied permissions or unavailable health services.
-- The remaining platform limitations are written down with a decision on whether the selected package is acceptable.
-
-**Risks**
-
-- Health APIs may differ in source metadata, permissions, route access, or background behavior.
-- Phone and wearable totals may overlap if the platform query is implemented incorrectly.
-- A package may support steps but not the complete workout, nutrition, or route surface needed later.
-
-**Checkpoint 0**
-
-- Attach device logs or screenshots for both platforms.
-- Record the selected package and rejected alternatives.
-- Record a sample day with expected total, accepted total, excluded records, and discrepancy explanation.
-- Do not start the full UI/game/social implementation until this checkpoint passes or the product owner explicitly accepts a documented limitation.
-
-## Phase 1 - Foundation and Private Access
-
-**Goal:** Establish the app shell, schema, authentication, and access boundaries.
-
-- Create the Flutter project with a clear feature-oriented structure.
-- Create Supabase migrations for:
-  - `profiles`;
-  - `daily_activity`;
-  - `workouts`;
-  - `workout_route_points`;
-  - `foods`;
-  - `food_entries`;
-  - `posts`;
-  - `post_media`;
-  - `comments`;
-  - `reactions`;
-  - `achievements`;
-  - `user_achievements`;
-  - `streaks`;
-  - `missions`;
-  - `mission_progress`;
-  - `seasons`;
-  - `season_points`;
-  - `season_results`;
-  - configurable app settings.
-- Add constraints and indexes from the specification, including:
-  - unique `(user_id, date)` for daily activity;
-  - workout source/external identifiers where available;
-  - route point ordering by `(workout_id, timestamp)`;
-  - reaction primary key `(post_id, user_id, emoji)`;
-  - unique achievement codes;
-  - season result primary key `(season_id, user_id)`.
-- Pre-create or allowlist exactly four authenticated accounts.
-- Reject authenticated identities without a matching allowlisted profile.
-- Implement row-level security so all four users can read shared data while writes remain owner-scoped.
-- Protect system-generated posts and point-awarding paths from arbitrary client edits.
-- Configure private storage buckets for avatars and media. Use authenticated access or signed URLs.
-- Implement the bottom navigation shell with product identifiers `HOY`, `RANKING`, `REGISTRAR`, `JUEGO`, and `NOSOTROS`.
-- Add loading, empty, permission, offline, and backend-error states before feature screens depend on them.
-
-**Dependencies**
-
-- Phase 0 health decision.
-- Supabase Auth, PostgreSQL, Storage, and migration workflow.
-- A documented local configuration mechanism with placeholders only; no secrets in source control.
-
-**Acceptance criteria**
-
-- All four known users can authenticate.
-- An unknown authenticated user cannot read app data.
-- Each user can update only their own profile and owner-scoped records.
-- All four users can read the shared profiles, feed, rankings, and statistics allowed by the specification.
-- Private media is not publicly readable.
-- The app shell launches on iOS and Android with explicit states for loading, empty data, offline, and denied permissions.
-
-**Risks**
-
-- Incorrect RLS policies can expose health, nutrition, location, or private media.
-- Schema decisions made before the health spike may force duplicate or non-idempotent storage.
-- Auth providers may require platform-specific setup that cannot be validated in a simulator.
-
-**Checkpoint 1**
-
-- Apply migrations to a clean Supabase environment.
-- Run an RLS matrix test for each table: owner read/write, peer read, peer write, unknown user access.
-- Verify that storage URLs cannot be fetched without authorized access.
-- Verify the same app shell works on one iOS and one Android test device.
-
-## Phase 2 - Health Sync, Daily Activity, and Rankings
-
-**Goal:** Deliver trustworthy automatic activity data and the four daily competitions.
-
-- Generalize the Phase 0 sync into a reusable health integration service.
-- Request only the permissions used by the current build.
-- Sync when the app opens, returns to foreground, is manually refreshed, and when background refresh is available.
-- Keep background behavior best-effort; never promise second-by-second synchronization.
-- Import steps, active calories, distance, and exercise minutes where available.
-- Preserve source metadata for troubleshooting and show freshness in the UI.
-- Implement configurable competition windows:
-  - morning: default 06:00-12:00;
-  - afternoon: default 12:00-18:00;
-  - night: default 18:00-24:00;
-  - total: default 00:00-24:00.
-- Use `competition_timezone` for all date and window calculations.
-- Recalculate daily aggregates idempotently from accepted source data.
-- Build the Today ranking and the Ranking views for:
-  - today;
-  - week;
-  - season;
-  - steps;
-  - rounds;
-  - distance;
-  - workouts;
-  - calories;
-  - nutrition;
-  - game points.
-- Include all four users in ranking output, including users with zero or stale data.
-- Make stale, missing, denied, and unavailable health data distinguishable.
-
-**Dependencies**
-
-- Passed Phase 0 and Phase 1 checkpoints.
-- Selected health package and platform permission configuration.
-- App configuration for timezone, windows, and default goals.
-
-**Acceptance criteria**
-
-- Two iPhones and two Android phones can connect to their respective health sources.
-- No UI permits manual step entry.
-- Detectable manual step samples are excluded.
-- Daily data is segmented correctly at configured boundaries.
-- Repeated syncs do not inflate totals.
-- Rankings show all four users and include freshness information.
-- A test day closely matches the platform's displayed automatic total after known manual records are excluded.
-
-**Risks**
-
-- Different HealthKit and Health Connect sources can produce different totals.
-- Background refresh is OS-controlled and may be delayed.
-- Date boundaries can be wrong if device timezone is used instead of the shared competition timezone.
-
-**Checkpoint 2**
-
-- Run a four-device test matrix with phone-only, wearable-connected, manual-entry, no-data, permission-denied, and stale-sync cases.
-- Store expected versus accepted totals and investigate every material discrepancy.
-- Freeze the aggregate contract before the game engine depends on it.
-
-## Phase 3 - Competition, Points, Missions, Streaks, and Seasons
-
-**Goal:** Make one full competition day run without manual administrative intervention.
-
-- Add server-side round-closing jobs for morning, afternoon, night, and daily total.
-- Record each round winner once and make job retries idempotent.
-- Implement configurable points for daily rank, round wins, step goals, workouts, calorie targets, and missions.
-- Write every awarded point to the immutable `season_points` ledger with reason and reference.
-- Derive standings from the ledger rather than mutable client totals.
-- Implement the monthly season lifecycle:
-  - load active season;
-  - stop awarding points to an ended season;
-  - freeze final standings;
-  - write `season_results`;
-  - award the season trophy;
-  - publish the season result event;
-  - create the next season with zero points.
-- Implement streaks with `current_count`, `longest_count`, and `last_qualified_date`.
-- Implement a generic achievement rule model using metric, operator, threshold, time window, repeatability, hidden status, and points.
-- Seed the initial achievement and mission packs from the specification.
-- Support individual, competitive, and cooperative mission progress.
-- Keep improvement ranking optional and clearly separate from raw step ranking.
-- Add the `JUEGO` screen for current season, standings, missions, streaks, achievements, trophies, and history.
-
-**Dependencies**
-
-- Phase 2 daily activity and ranking contracts.
-- Reliable server scheduling or equivalent Supabase Edge Function execution.
-- Backend configuration for point values and lifecycle times.
-
-**Acceptance criteria**
-
-- One simulated or real full competition day closes each round once.
-- Retries do not duplicate winners, achievements, mission completion, or points.
-- A season can close and produce one champion plus four final result rows.
-- A user cannot create or edit season points from the client.
-- Streaks and non-repeatable achievements are stable across repeated evaluation.
-
-**Risks**
-
-- Scheduled jobs may run late or retry after partial completion.
-- Mutable score totals can drift if the ledger is bypassed.
-- Generic mission rules may become too flexible to test or too coupled to UI.
-
-**Checkpoint 3**
-
-- Run a time-controlled end-to-end day across all four users.
-- Force retries and duplicate event delivery.
-- Reconcile displayed standings with the immutable point ledger.
-- Verify old-season points stop at the configured cutoff and historical results remain readable.
-
-## Phase 4 - Private Social Feed and Notifications
-
-**Goal:** Let the four users follow the day through a shared, low-noise timeline.
-
-- Build the feed from manual posts and automatic activity events.
-- Support text, photos, meals, workouts, routes, achievements, steps, ranking changes, round results, missions, and seasons.
-- Add private media upload with client-side compression, orientation preservation, thumbnails, and visible retry states.
-- Add captions, optional explicit post location, and references to meals, workouts, and achievements.
-- Add the initial reaction set with one reaction per emoji per user per post.
-- Add flat comments with author, timestamp, and delete-own behavior.
-- Use Supabase Realtime for new posts, comments, reactions, ranking updates, mission completion, and achievement events.
-- Keep database reads authoritative and recover cleanly after reconnects.
-- Add rate limits or cooldowns for leader-change events to avoid feed spam.
-- Add notification preferences for overtakes, round endings, achievements, workouts, comments/reactions, missions, and season results.
-- Keep all user-facing copy playful and social, never medical or shame-oriented.
-
-**Dependencies**
-
-- Phase 1 private media and RLS.
-- Phase 3 event and lifecycle rules.
-- Push notification setup for APNs/FCM if notifications are included in the current release.
-
-**Acceptance criteria**
-
-- All four users can see a shared feed without public discovery.
-- A user can create and delete their own manual post, but cannot edit protected system posts.
-- Photos upload in compressed form and failed uploads can be retried.
-- Comments and reactions obey ownership and uniqueness rules.
-- Automatic step, workout, achievement, mission, round, and season events appear without excessive duplicates.
-- Realtime reconnects do not lose the database-backed event.
-
-**Risks**
-
-- Realtime-only UI can diverge after reconnects or missed events.
-- Unbounded media sizes can create storage and performance problems.
-- Automatic event volume can make the feed noisy and reduce its motivational value.
-
-**Checkpoint 4**
-
-- Test feed creation and recovery on offline/online transitions.
-- Verify RLS and storage access with all four accounts.
-- Review an entire sample day for event duplication, ordering, and tone.
-
-## Phase 5 - Nutrition and Barcode Food Logging
-
-**Goal:** Make nutrition logging fast while preserving the distinction between food entry and health-derived steps.
-
-- Add calorie target and optional macro targets to profiles.
-- Implement meal types: breakfast, lunch, dinner, snack, and other.
-- Implement food search in this priority order:
-  - barcode scan;
-  - Open Food Facts;
-  - USDA FoodData Central fallback;
-  - private/group cache;
-  - custom food.
-- Use `mobile_scanner` or the selected maintained barcode library for EAN/UPC scanning.
-- Store nutrition snapshots on food entries so later source changes do not rewrite historical meals.
-- Allow manual food entry. Do not reuse this path for steps.
-- Add private food cache records for missing products so the next user can resolve the barcode immediately.
-- Add meal photos and optional publication to the feed.
-- Calculate consumed calories, remaining configured target, macros, meal count, and `within_calorie_target`.
-- Do not present consumed calories minus exercise calories as a metabolic deficit unless a separate validated model is introduced.
-- Add the meal summary screen and useful error states for not-found products, API failures, and upload failures.
-
-**Dependencies**
-
-- Phase 1 schema, storage, and private access.
-- Camera permissions.
-- Open Food Facts and USDA integration decisions.
-- No paid API dependency unless coverage testing proves it necessary.
-
-**Acceptance criteria**
-
-- A packaged food can be scanned, resolved, portioned, assigned to a meal, and saved.
-- Missing products can be created once and reused by all four users.
-- Search and custom food entries calculate calories and macros.
-- Meal photos are private by default and publish only through explicit user action.
-- Daily nutrition totals match the saved food-entry snapshots.
-
-**Risks**
-
-- Public food data may have missing, inconsistent, or unit-dependent nutrition values.
-- API outages must not prevent custom food creation.
-- Nutrition estimates from photos can be misleading if presented as facts.
-
-**Checkpoint 5**
-
-- Test barcode hit, barcode miss, API outage, custom food, quantity changes, meal edit/delete, and photo upload failure.
-- Verify the app labels any future photo-based nutrition estimation as approximate and adjustable.
-- Confirm no step-entry control has been introduced through shared form components.
-
-## Phase 6 - Workouts, Routes, Maps, and Profile History
-
-**Goal:** Complete the activity and history surfaces defined for the MVP.
-
-- Import workouts from HealthKit and Health Connect where available.
-- De-duplicate using source and external workout identifiers when available.
-- Store workout type, times, duration, distance, calories, pace/speed, source, and route availability.
-- Import route points when available and store only fields supplied by the platform.
-- Render a route map in workout detail and a compact map preview in the feed.
-- Use `flutter_map` with OpenStreetMap tiles or MapLibre after licensing, maintenance, and platform behavior review.
-- Do not implement navigation or live location tracking.
-- Make location sharing explicit and post-scoped only.
-- Add workout sharing cards and the `Publish to feed` action.
-- Complete `NOSOTROS` profiles with current stats, season rank, streaks, trophies, and historical totals.
-- Add season history and champion records.
-
-**Dependencies**
-
-- Phase 0 health package supports workouts and route access, or approved platform-specific extensions.
-- Location permission only for explicit route/post features.
-- Map provider and tile policy decision.
-
-**Acceptance criteria**
-
-- An imported run or workout appears once with correct core stats.
-- A route is rendered when route data exists and the screen handles route-unavailable cases.
-- A workout can be shared without exposing live location.
-- Profile and season-history data remain available after a season reset.
-
-**Risks**
-
-- Route permissions and route availability vary by platform and workout source.
-- Map tiles can create network, licensing, or quota constraints.
-- Raw route points can be large and should not be fetched unnecessarily.
-
-**Checkpoint 6**
-
-- Test a workout with route, without route, duplicate source ID, denied route permission, and offline upload.
-- Verify map rendering on both platforms and bounded route queries.
-- Confirm no background location tracking is present.
-
-## Phase 7 - Hardening, Backup, and Release Readiness
-
-**Goal:** Turn the MVP into a reliable private daily-use app.
-
-- Complete offline caching for latest stats, rankings, feed, profiles, and pending food/posts.
-- Add retry and conflict behavior for health upserts, media uploads, and optimistic feed changes.
-- Add explicit stale-sync, no-data, permission-denied, API-unavailable, and backend-offline states.
-- Add performance checks for feed pagination, ranking queries, image sizes, and route payloads.
-- Add scheduled backup verification and document data ownership/recovery procedures.
-- Verify configuration can change competition windows, timezone, season type, point values, default goals, and event cooldowns without an app redeploy where intended.
-- Run the complete core acceptance checklist from `SPECS.md`.
-- Verify release builds on two iPhones and two Android phones.
-- Document remaining platform limitations and future ideas separately from MVP commitments.
-
-**Dependencies**
-
-- Phases 1-6 complete.
-- Release signing and mobile store/test-distribution access.
-- Backup access for Supabase/Postgres and storage.
-
-**Acceptance criteria**
-
-- The core app acceptance criteria in the specification all pass or have an explicitly accepted exception.
-- A temporary backend outage does not destroy pending user input.
-- Backups and restore/rebuild procedures are tested, not merely documented.
-- No secrets, public private-media buckets, debug bypasses, or unrestricted test accounts remain in release configuration.
-- A new developer can follow `README.md` and `CODESTYLE.md` to build, test, and diagnose the project.
-
-**Risks**
-
-- OS updates can change health permissions or background behavior.
-- Backup procedures may exist on paper but fail during an actual restore.
-- A polish pass can accidentally broaden scope or weaken privacy.
-
-**Checkpoint 7 - Release Gate**
-
-- Product owner signs off on the four-device acceptance matrix.
-- Engineering signs off on tests, migrations, RLS, storage, backups, and release configuration.
-- Record the build identifier, selected dependency versions, known limitations, and rollback/recovery path.
-- Only then label the build as the finished MVP.
+Goal: prove the single hardest dependency (automatic step reads on both platforms) before any broad UI, game, or social work.
+
+- [ ] 0.1 Confirm toolchain: Flutter SDK stable, Xcode with a paid-or-free Apple signing identity, Android SDK, Health Connect available on the Android test device, and a Supabase project with the CLI logged in.
+- [ ] 0.2 Create the minimal Flutter app with one screen: connect, sync, display today's totals per window, display `last_synced`.
+- [ ] 0.3 Evaluate Flutter health abstraction candidates (`health` plugin, CARP Health, ConnectKit) against: HealthKit support, Health Connect support, interval/windowed queries, per-record source metadata, manual-entry detection, workouts, route access, background delivery. Record the decision and rejected alternatives in the checkpoint note.
+- [ ] 0.4 Request only the permissions this spike needs (steps read on both platforms).
+- [ ] 0.5 Read today's steps on one physical iPhone and one physical Android phone.
+- [ ] 0.6 Filter out records the platform flags as manually entered; log the filter decision with source metadata for diagnostics.
+- [ ] 0.7 Use platform aggregation APIs (not naive raw-record summation) so phone + wearable overlap does not double count. Document the aggregation strategy per platform.
+- [ ] 0.8 Split accepted steps into `morning_steps` (06:00-12:00), `afternoon_steps` (12:00-18:00), `night_steps` (18:00-24:00), `daily_steps` using `competition_timezone`, with window boundaries read from config.
+- [ ] 0.9 Create the `daily_activity` table (migration 0001) with `unique(user_id, date)` and upsert one aggregate row per user per day.
+- [ ] 0.10 Store diagnostic source metadata (`platform`, `source_app`, `source_device`, `recording_method`, `manual_entry_detected`) in a side table or JSONB column, kept out of the normal UI.
+- [ ] 0.11 Validation day: on each device, record the platform health app's displayed total, the app's accepted total, known manual entries, and the delta. Any material discrepancy is investigated and explained in the checkpoint note.
+- [ ] 0.12 Show visible states: syncing, success with `last_synced`, permission denied, health service unavailable, no data.
+
+Dependencies: physical iPhone and Android phone; Supabase project; test Apple/Google signing.
+
+Acceptance criteria:
+
+- Same spike build reads automatic steps on both platforms.
+- Detectable manual records are excluded.
+- Window segmentation matches `competition_timezone`, not device timezone.
+- Running sync twice in a row produces one row and identical totals.
+- Package decision is documented with evidence.
+
+Checkpoint 0 evidence required:
+
+- Device logs or screenshots from both phones.
+- Table of test day: platform total vs accepted total vs excluded manual records.
+- Written go/no-go on the chosen health package, including gaps that need native channels.
+
+Gate: no Phase 1+ UI/game/social work until this checkpoint passes or the product owner signs off on a documented limitation.
+
+---
+
+## Phase 1 - Foundation, Auth, Schema, RLS
+
+Goal: all four users log into a private, correctly secured app shell.
+
+- [ ] 1.1 Scaffold the Flutter app with feature-oriented structure: `auth`, `profiles`, `health`, `activity`, `ranking`, `nutrition`, `workouts`, `feed`, `game`, `notifications`, `shared`.
+- [ ] 1.2 Add linting and formatting: `flutter_lints` (or stricter), `dart format`, CI step that fails on analyzer warnings.
+- [ ] 1.3 Create `.env.example` with placeholder names only (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `COMPETITION_TZ`). No real values in source control.
+- [ ] 1.4 Write migrations for the full schema from `SPECS.md` section 40: `profiles`, `daily_activity`, `workouts`, `workout_route_points`, `foods`, `food_entries`, `posts`, `post_media`, `comments`, `reactions`, `achievements`, `user_achievements`, `streaks`, `missions`, `mission_progress`, `seasons`, `season_points`, `season_results`, plus `app_config`.
+- [ ] 1.5 Add all constraints and indexes from the spec: `unique(user_id, date)` on `daily_activity`, `unique(source, external_id)` on `workouts`, index `(workout_id, timestamp)` on route points, PK `(post_id, user_id, emoji)` on `reactions`, unique `code` on `achievements`, PK `(season_id, user_id)` on `season_results`, and a uniqueness guard on `season_points (season_id, user_id, reason, reference_type, reference_id)` to make ledger inserts idempotent.
+- [ ] 1.6 Seed `app_config` with: `competition_timezone`, round windows, `season_type`, default step/calorie goals, point values, `leader_event_cooldown`.
+- [ ] 1.7 Pre-create exactly four auth users and four matching `profiles` rows via a seed script. Document the script; do not commit credentials.
+- [ ] 1.8 Add an allowlist enforcement function: any authenticated user without a `profiles` row is rejected at the app layer and reads nothing at the RLS layer.
+- [ ] 1.9 Enable RLS on every table. Policies: all four users read shared data; only owner writes owner-scoped rows; `season_points`, `season_results`, `seasons`, `achievements`, and system posts are insertable only by the service role (Edge Functions), never by clients.
+- [ ] 1.10 Create private storage buckets: `avatars`, `feed-media`, `meal-media`, `workout-media`. Authenticated read via signed URLs or storage RLS; no public access.
+- [ ] 1.11 Build the bottom navigation shell with the five product tabs (`HOY`, `RANKING`, `REGISTRAR`, `JUEGO`, `NOSOTROS`) routed to placeholder screens.
+- [ ] 1.12 Add shared UI states: loading, empty, offline, permission-denied, backend-error. Every feature screen must consume these rather than inventing its own.
+- [ ] 1.13 Write an RLS integration test matrix executed against a local Supabase instance: for each table, verify owner read/write, peer read, peer write blocked, unknown authenticated user blocked, anonymous blocked.
+
+Dependencies: Phase 0 package decision; Supabase CLI workflow.
+
+Acceptance criteria:
+
+- All four users authenticate; unknown users read nothing.
+- RLS matrix passes for every table.
+- Private media URL fetched without auth fails.
+- App shell runs on one iOS and one Android device.
+
+Checkpoint 1 evidence required:
+
+- `supabase db reset` from scratch succeeds.
+- RLS test output attached.
+- Storage negative test output attached.
+
+---
+
+## Phase 2 - Health Sync and Daily Rankings
+
+Goal: trustworthy automatic activity data powering the four daily competitions.
+
+- [ ] 2.1 Promote the Phase 0 spike into a reusable `health` feature module with a platform-agnostic repository interface and per-platform adapters.
+- [ ] 2.2 Define the sync trigger set: app open, foreground resume, manual pull-to-refresh, OS background refresh (best effort), platform data notifications where supported. Never promise real-time sync.
+- [ ] 2.3 Extend ingestion to active calories, distance, and exercise minutes where the platform exposes them.
+- [ ] 2.4 Implement the segmentation service as pure Dart: input records + timezone + windows, output per-window aggregates. Unit-test boundary records at exactly 06:00, 12:00, 18:00, 00:00 and DST transitions in the competition timezone.
+- [ ] 2.5 Sync pipeline: read -> filter manual -> aggregate per platform semantics -> segment -> upsert `(user_id, date)` -> update `synced_at`. Make every step retryable.
+- [ ] 2.6 Build the `HOY` top section: personal summary (steps, active kcal, workouts, kcal consumed/target) plus the four-person current ranking.
+- [ ] 2.7 Build the `RANKING` screen: segmented `Today | Week | Season`, category selector (steps, rounds, distance, workouts, calories, nutrition, game points). Always render all four users, including zero-data and stale-data users, with a visible staleness indicator.
+- [ ] 2.8 Show `last synced` per user wherever rankings are displayed. Distinguish stale, missing, denied, and unavailable as different UI states.
+- [ ] 2.9 Offline read cache for the latest known stats with a clear cached-data indicator.
+- [ ] 2.10 Four-device test matrix: phone-only, wearable-connected, manual-entry present, no data, permission denied, stale sync. Record expected vs accepted totals per case.
+
+Dependencies: Phases 0 and 1 checkpoints.
+
+Acceptance criteria:
+
+- Two iPhones and two Android phones sync automatically.
+- No manual step entry exists anywhere.
+- Repeated syncs never inflate totals.
+- A full test day matches the platform total after excluding known manual records, within a documented tolerance.
+
+Checkpoint 2 evidence required:
+
+- Test matrix results table.
+- Unit test output for segmentation boundaries.
+- Freeze the daily aggregate contract (field names, semantics, tolerance) in a short `docs/activity-contract.md`.
+
+---
+
+## Phase 3 - Game Core: Rounds, Points, Missions, Streaks, Seasons
+
+Goal: one full competition day runs automatically end to end.
+
+- [ ] 3.1 Create Edge Functions (Deno) with a shared validation library: `close_round`, `close_day`, `close_season`, `evaluate_achievements`, `evaluate_missions`, `evaluate_streaks`.
+- [ ] 3.2 Schedule `close_round` at 12:00, 18:00, 00:00 in `competition_timezone` via Supabase scheduled jobs. Each job writes its winner row once; retries are idempotent via uniqueness constraints.
+- [ ] 3.3 Implement point rules from `app_config`: daily rank (10/7/4/2), round wins (+3 each), step goal (+2), workout (+3), within calorie target (+2), mission rewards (variable).
+- [ ] 3.4 All point awards go through a single `award_points` Postgres function that inserts into `season_points` with reason and reference, and is callable only by the service role. Clients cannot call it.
+- [ ] 3.5 Derive standings as a view over `season_points`. No mutable score columns.
+- [ ] 3.6 Implement `close_day`: closes night round, awards daily rank points, evaluates daily streaks, evaluates achievements, updates historical stats, publishes the daily summary event, all inside one transaction.
+- [ ] 3.7 Implement streaks with `current_count`, `longest_count`, `last_qualified_date`. Unit-test transitions: qualify, extend, break, re-qualify, timezone edge.
+- [ ] 3.8 Implement the generic achievement engine: `metric`, `operator`, `threshold`, `time_window`, `repeatable`, `hidden`, `season_points`. Seed the initial pack from `SPECS.md` section 65. Non-repeatable achievements get a uniqueness constraint on `(user_id, achievement_id)`.
+- [ ] 3.9 Implement mission engine for individual, competitive, and cooperative missions. Seed the initial pack from `SPECS.md` section 66. Cooperative progress uses a group row (`user_id` null).
+- [ ] 3.10 Implement `close_season`: freeze standings, write `season_results` for all four users, award champion trophy, publish season result event, create next season. Transactional; safe to retry.
+- [ ] 3.11 Build the `JUEGO` screen: current season, standings, today's missions, streaks, achievements, trophy cabinet, season history.
+- [ ] 3.12 Optional personal-improvement ranking (vs trailing 14-day average) displayed separately from raw rankings.
+- [ ] 3.13 Time-controlled end-to-end test: simulate a full day for four users with scripted data, force job retries and duplicate event delivery, verify no duplicated winners, points, achievements, or feed events.
+
+Dependencies: Phase 2 aggregate contract; Supabase Edge Functions + scheduler.
+
+Acceptance criteria:
+
+- A full simulated day closes every round exactly once.
+- Standings reconcile with the ledger sum.
+- Season close produces one champion and four result rows; old season stops accepting points at cutoff.
+- Client-side point manipulation is impossible (RLS + service-role-only function).
+
+Checkpoint 3 evidence required:
+
+- E2E day simulation output with retry/duplication forcing.
+- Ledger reconciliation query results.
+
+---
+
+## Phase 4 - Private Feed and Notifications
+
+Goal: the four users follow the day through a shared, low-noise timeline.
+
+- [ ] 4.1 Build the feed from `posts` (manual + system) with pagination (cursor on `created_at`), ordered timeline, and per-type card renderers: text, photo, meal, workout, route, achievement, steps, ranking_change, round_result, mission, season.
+- [ ] 4.2 Manual post composer: caption, photo(s), optional explicit location (name + coordinates), optional linked meal/workout/achievement.
+- [ ] 4.3 Media pipeline: client-side compression, orientation preservation, thumbnail generation, upload with visible progress and retry on failure. Failures never silently drop the post.
+- [ ] 4.4 Reactions: fixed emoji set, one reaction per `(post_id, user_id, emoji)`, toggle to remove.
+- [ ] 4.5 Comments: flat list, author, timestamp, delete-own only.
+- [ ] 4.6 System event generation server-side: step milestones (5k/10k/15k/20k), personal records, leader changes, round results, daily winner, workout completed, 5k/10k runs, achievements, missions, season events.
+- [ ] 4.7 Rate-limit leader-change events: publish only if the lead change persists for the configured cooldown window; at most one per pair per window.
+- [ ] 4.8 Wire Supabase Realtime for posts, comments, reactions, ranking updates, mission and achievement events. On reconnect, re-fetch from the database rather than trusting the stream.
+- [ ] 4.9 Push notifications via FCM/APNs with per-user preference categories: overtakes, round endings, achievements, workouts, comments/reactions, missions, season results. Copy tone per `SPECS.md` section 68: playful, never medical or shame-oriented.
+- [ ] 4.10 System posts are insertable only by the service role; clients cannot forge them (RLS + `system_generated` guard).
+
+Dependencies: Phases 1 and 3.
+
+Acceptance criteria:
+
+- Shared feed works for all four users; no public access path exists.
+- Media uploads compress, retry, and never lose user intent.
+- Automatic events appear without spam or duplicates.
+- Realtime disconnect/reconnect does not lose or duplicate events.
+
+Checkpoint 4 evidence required:
+
+- Offline/online transition test results.
+- Full sample-day feed review for duplication, ordering, and tone.
+- RLS verification for system-post insertion attempts from a client token.
+
+---
+
+## Phase 5 - Nutrition and Barcode Logging
+
+Goal: food logging is fast, private, and completely separate from step rules.
+
+- [ ] 5.1 Profile fields: `daily_calorie_target`, optional `protein_target_g`, `carb_target_g`, `fat_target_g`.
+- [ ] 5.2 Meal types: breakfast, lunch, dinner, snack, other.
+- [ ] 5.3 `REGISTRAR` tab actions: scan barcode, search food, photograph meal, create meal, new post, post location, share workout. No step-related action exists.
+- [ ] 5.4 Barcode scanning with `mobile_scanner` for EAN/UPC.
+- [ ] 5.5 Lookup priority: barcode -> Open Food Facts -> private cache -> USDA fallback -> custom food creation. Cache resolved products in `foods`.
+- [ ] 5.6 Food entries store a nutrition snapshot (calories, protein, carbs, fat at time of logging) so later source changes never rewrite history.
+- [ ] 5.7 Custom food creation with optional barcode; immediately reusable by all four users via the private cache.
+- [ ] 5.8 Meal photos with optional feed publication. Photos are private by default.
+- [ ] 5.9 Meal summary screen: per-meal calories, consumed/target/remaining, macro totals.
+- [ ] 5.10 `within_calorie_target = consumed <= daily_calorie_target`. Never present food minus exercise as a metabolic deficit.
+- [ ] 5.11 Resilient external API handling: timeouts, not-found, malformed responses, offline. API outage never blocks custom food creation.
+- [ ] 5.12 Error copy per `SPECS.md` section 60, including the "create it once and all four users get it" flow.
+
+Dependencies: Phase 1 schema/storage; camera permission.
+
+Acceptance criteria:
+
+- Scan -> resolve -> portion -> meal -> save completes in seconds.
+- Unknown barcode can be created once and reused by all four users.
+- Daily totals match stored snapshots exactly.
+- No manual step entry path was introduced through any shared form.
+
+Checkpoint 5 evidence required:
+
+- Test run: barcode hit, barcode miss -> custom create -> second user scan hit, API outage, quantity edit, entry delete, photo upload failure and retry.
+
+---
+
+## Phase 6 - Workouts, Routes, Maps, Profile History
+
+Goal: complete the activity surfaces of the MVP.
+
+- [ ] 6.1 Import workouts from HealthKit and Health Connect: type, start/end, duration, distance, active calories, pace/speed, source.
+- [ ] 6.2 De-duplicate on `(source, external_id)` where the platform provides one; document behavior where it does not.
+- [ ] 6.3 Import route points when available, storing only fields the platform supplies. Bound route queries (pagination or decimation for display).
+- [ ] 6.4 Workout detail screen: stats, map with route polyline, `Publish to feed` action.
+- [ ] 6.5 Feed workout/route cards with compact map preview.
+- [ ] 6.6 Map stack: `flutter_map` + OpenStreetMap tiles after reviewing tile usage policy; MapLibre as the alternative. No navigation, no turn-by-turn, no live tracking.
+- [ ] 6.7 Location permission is requested only when the user explicitly uses a route or post-location feature.
+- [ ] 6.8 `NOSOTROS` screen: the four profiles with avatar, season rank, today's steps, streaks, weekly workouts/distance, season points, trophies.
+- [ ] 6.9 Profile historical stats: lifetime steps/distance/workouts/calories, daily and round wins, season wins, longest streaks.
+- [ ] 6.10 Season history with champions list.
+
+Dependencies: Phase 0/2 health package route support (or documented native extension); map provider decision.
+
+Acceptance criteria:
+
+- An outdoor run appears once with correct stats and a rendered route.
+- Route-unavailable and permission-denied cases render clean states.
+- No background location tracking exists anywhere.
+- Historical stats survive season resets.
+
+Checkpoint 6 evidence required:
+
+- Test run: workout with route, without route, duplicate external ID, denied route permission, offline import and later upload.
+- Map render verification on both platforms.
+
+---
+
+## Phase 7 - Hardening, Backup, Release
+
+Goal: the MVP becomes a reliable daily-use private app.
+
+- [ ] 7.1 Complete offline support: cached reads for stats, rankings, feed, profiles; queued writes for food entries, posts, media, health sync; visible retry on reconnect.
+- [ ] 7.2 Audit every async failure path against the state taxonomy (denied, unavailable, no data, stale, backend down, validation, retryable) and give each a user-visible recovery action.
+- [ ] 7.3 Performance pass: feed pagination, ranking queries with proper indexes, image size budgets, route payload bounds.
+- [ ] 7.4 Backup: verify Supabase/Postgres backup schedule, test an actual restore into a clean project, document the rebuild procedure for derived data from immutable records.
+- [ ] 7.5 Configuration audit: round windows, timezone, season type, point values, goals, cooldowns all changeable via `app_config` without redeploy.
+- [ ] 7.6 Security sweep: no secrets in the repo, no public buckets, no debug bypasses, no extra test accounts, permissions minimized, logs free of sensitive payloads.
+- [ ] 7.7 Run the complete 21-point acceptance checklist from `SPECS.md` section 73 on release builds across all four devices.
+- [ ] 7.8 Write the operational runbook: deploy, migrate, rollback, restore, rotate keys, add a replacement device.
+
+Dependencies: Phases 1-6 complete; signing and distribution access.
+
+Acceptance criteria:
+
+- Every `SPECS.md` acceptance criterion passes or has a written owner-accepted exception.
+- Restore procedure is tested, not just documented.
+- Release configuration contains no secrets, debug paths, or public access.
+
+Checkpoint 7 (release gate) evidence required:
+
+- Four-device acceptance matrix signed off.
+- Restore test output.
+- Build identifiers, dependency versions, known limitations, rollback path recorded here.
+
+---
 
 ## Cross-Phase Verification Matrix
 
-- **Identity:** four allowlisted users can log in; unknown users cannot read data.
-- **Health:** iOS HealthKit and Android Health Connect both work; manual steps are excluded where detectable.
-- **Time:** all daily rounds and seasons use `competition_timezone`.
-- **Data:** daily aggregates are idempotent; workouts are de-duplicated; points use an immutable ledger.
-- **Privacy:** shared visibility is limited to the four users; media is private; location is explicit and post-scoped.
-- **Social:** posts, comments, reactions, and automatic events are recoverable from the database.
-- **Nutrition:** barcode, search, cache, custom food, meal photos, and macro totals work without affecting step rules.
-- **Offline:** cached reads remain useful; pending writes retry visibly.
-- **Operations:** backups, configuration, logs, and release diagnostics are documented.
+Run at every checkpoint; a regression in any row blocks release.
+
+| Area | Invariant |
+| --- | --- |
+| Identity | Four allowlisted users only; unknown identities read nothing |
+| Health | HealthKit + Health Connect both work; detectable manual steps excluded |
+| Time | All rounds and seasons use `competition_timezone` |
+| Data | Daily aggregates idempotent; workouts de-duplicated; points ledger append-only |
+| Privacy | Shared visibility limited to the four; private media; explicit post-scoped location only |
+| Social | Feed, comments, reactions, events recoverable from the database after reconnect |
+| Nutrition | Barcode, search, cache, custom food, photos, macros; no interaction with step rules |
+| Offline | Cached reads useful; pending writes retry visibly |
+| Operations | Backups, config, logs, release diagnostics documented and tested |
+
+## Checkpoint Log
+
+Append entries here as phases complete. Do not delete history.
+
+| Checkpoint | Date | Result | Evidence | Known limitations |
+| --- | --- | --- | --- | --- |
+| 0 | - | pending | - | - |
+| 1 | - | pending | - | - |
+| 2 | - | pending | - | - |
+| 3 | - | pending | - | - |
+| 4 | - | pending | - | - |
+| 5 | - | pending | - | - |
+| 6 | - | pending | - | - |
+| 7 | - | pending | - | - |
