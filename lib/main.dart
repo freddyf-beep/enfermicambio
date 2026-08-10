@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:timezone/data/latest.dart' as timezone_data;
 
-import 'features/health/data/health_plugin_repository.dart';
-import 'features/health/presentation/health_spike_screen.dart';
+import 'features/app/presentation/app_shell.dart';
 
 void main() {
   timezone_data.initializeTimeZones();
@@ -24,7 +23,7 @@ class EnfermicambioApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: HealthSpikeScreen(repository: HealthPluginRepository()),
+      home: const AppShell(),
     );
   }
 }

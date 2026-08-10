@@ -77,8 +77,8 @@ Goal: all four users log into a private, correctly secured app shell.
 - [ ] 1.8 Add an allowlist enforcement function: any authenticated user without a `profiles` row is rejected at the app layer and reads nothing at the RLS layer. `is_allowlisted_user()` in migration 0001; client enforcement pending.
 - [x] 1.9 Enable RLS on every table. Policies: all four users read shared data; only owner writes owner-scoped rows; `season_points`, `season_results`, `seasons`, `achievements`, and system posts are insertable only by the service role (Edge Functions), never by clients. Verified: anonymous REST to `workouts`/`season_standings` returns 401 (2026-08-10).
 - [x] 1.10 Create private storage buckets: `avatars`, `feed-media`, `meal-media`, `workout-media`. Authenticated read via signed URLs or storage RLS; no public access. Buckets created with `public=false`; anonymous bucket list returns `[]` (2026-08-10).
-- [ ] 1.11 Build the bottom navigation shell with the five product tabs (`HOY`, `RANKING`, `REGISTRAR`, `JUEGO`, `NOSOTROS`) routed to placeholder screens.
-- [ ] 1.12 Add shared UI states: loading, empty, offline, permission-denied, backend-error. Every feature screen must consume these rather than inventing its own.
+- [x] 1.11 Build the bottom navigation shell with the five product tabs (`HOY`, `RANKING`, `REGISTRAR`, `JUEGO`, `NOSOTROS`) routed to placeholder screens. Implemented in `lib/features/app/presentation/app_shell.dart`; widget tests cover the five tabs and tab switching (2026-08-10).
+- [x] 1.12 Add shared UI states: loading, empty, offline, permission-denied, backend-error. Every feature screen must consume these rather than inventing its own. `AsyncViewStatus`/`AsyncStateView` in `lib/shared/ui/`; consumed by all five tab screens; widget test covers permission-denied rendering (2026-08-10).
 - [ ] 1.13 Write an RLS integration test matrix executed against a local Supabase instance: for each table, verify owner read/write, peer read, peer write blocked, unknown authenticated user blocked, anonymous blocked.
 
 Dependencies: Phase 0 package decision; Supabase CLI workflow.
