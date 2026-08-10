@@ -42,7 +42,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Today, week, and season rankings will appear here.'),
+      find.text(
+        'Today, week, and season rankings will appear here once the group '
+        'syncs their activity.',
+      ),
       findsOneWidget,
     );
 
