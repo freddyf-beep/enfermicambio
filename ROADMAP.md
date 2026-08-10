@@ -70,13 +70,13 @@ Goal: all four users log into a private, correctly secured app shell.
 - [ ] 1.1 Scaffold the Flutter app with feature-oriented structure: `auth`, `profiles`, `health`, `activity`, `ranking`, `nutrition`, `workouts`, `feed`, `game`, `notifications`, `shared`.
 - [ ] 1.2 Add linting and formatting: `flutter_lints` (or stricter), `dart format`, CI step that fails on analyzer warnings.
 - [ ] 1.3 Create `.env.example` with placeholder names only (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `COMPETITION_TZ`). No real values in source control.
-- [ ] 1.4 Write migrations for the full schema from `SPECS.md` section 40: `profiles`, `daily_activity`, `workouts`, `workout_route_points`, `foods`, `food_entries`, `posts`, `post_media`, `comments`, `reactions`, `achievements`, `user_achievements`, `streaks`, `missions`, `mission_progress`, `seasons`, `season_points`, `season_results`, plus `app_config`.
-- [ ] 1.5 Add all constraints and indexes from the spec: `unique(user_id, date)` on `daily_activity`, `unique(source, external_id)` on `workouts`, index `(workout_id, timestamp)` on route points, PK `(post_id, user_id, emoji)` on `reactions`, unique `code` on `achievements`, PK `(season_id, user_id)` on `season_results`, and a uniqueness guard on `season_points (season_id, user_id, reason, reference_type, reference_id)` to make ledger inserts idempotent.
-- [ ] 1.6 Seed `app_config` with: `competition_timezone`, round windows, `season_type`, default step/calorie goals, point values, `leader_event_cooldown`.
+- [x] 1.4 Write migrations for the full schema from `SPECS.md` section 40: `profiles`, `daily_activity`, `workouts`, `workout_route_points`, `foods`, `food_entries`, `posts`, `post_media`, `comments`, `reactions`, `achievements`, `user_achievements`, `streaks`, `missions`, `mission_progress`, `seasons`, `season_points`, `season_results`, plus `app_config`. Applied as `20260810231207_full_schema` to remote project (2026-08-10).
+- [x] 1.5 Add all constraints and indexes from the spec: `unique(user_id, date)` on `daily_activity`, `unique(source, external_id)` on `workouts`, index `(workout_id, timestamp)` on route points, PK `(post_id, user_id, emoji)` on `reactions`, unique `code` on `achievements`, PK `(season_id, user_id)` on `season_results`, and a uniqueness guard on `season_points (season_id, user_id, reason, reference_type, reference_id)` to make ledger inserts idempotent. All present in migration 0002.
+- [ ] 1.6 Seed `app_config` with: `competition_timezone`, round windows, `season_type`, default step/calorie goals, point values, `leader_event_cooldown`. Timezone still provisional `UTC`; remaining values seeded in migration 0001.
 - [ ] 1.7 Pre-create exactly four auth users and four matching `profiles` rows via a seed script. Document the script; do not commit credentials.
-- [ ] 1.8 Add an allowlist enforcement function: any authenticated user without a `profiles` row is rejected at the app layer and reads nothing at the RLS layer.
-- [ ] 1.9 Enable RLS on every table. Policies: all four users read shared data; only owner writes owner-scoped rows; `season_points`, `season_results`, `seasons`, `achievements`, and system posts are insertable only by the service role (Edge Functions), never by clients.
-- [ ] 1.10 Create private storage buckets: `avatars`, `feed-media`, `meal-media`, `workout-media`. Authenticated read via signed URLs or storage RLS; no public access.
+- [ ] 1.8 Add an allowlist enforcement function: any authenticated user without a `profiles` row is rejected at the app layer and reads nothing at the RLS layer. `is_allowlisted_user()` in migration 0001; client enforcement pending.
+- [x] 1.9 Enable RLS on every table. Policies: all four users read shared data; only owner writes owner-scoped rows; `season_points`, `season_results`, `seasons`, `achievements`, and system posts are insertable only by the service role (Edge Functions), never by clients. Verified: anonymous REST to `workouts`/`season_standings` returns 401 (2026-08-10).
+- [x] 1.10 Create private storage buckets: `avatars`, `feed-media`, `meal-media`, `workout-media`. Authenticated read via signed URLs or storage RLS; no public access. Buckets created with `public=false`; anonymous bucket list returns `[]` (2026-08-10).
 - [ ] 1.11 Build the bottom navigation shell with the five product tabs (`HOY`, `RANKING`, `REGISTRAR`, `JUEGO`, `NOSOTROS`) routed to placeholder screens.
 - [ ] 1.12 Add shared UI states: loading, empty, offline, permission-denied, backend-error. Every feature screen must consume these rather than inventing its own.
 - [ ] 1.13 Write an RLS integration test matrix executed against a local Supabase instance: for each table, verify owner read/write, peer read, peer write blocked, unknown authenticated user blocked, anonymous blocked.
@@ -312,6 +312,7 @@ Append entries here as phases complete. Do not delete history.
 | --- | --- | --- | --- | --- |
 | 0 | 2026-08-10 | In progress | `flutter analyze` clean; `flutter test` 2 passed; debug APK built; `docs/checkpoint-0.md` | Device validation (0.5/0.7/0.11), Xcode, Supabase CLI pending |
 | 1 | - | pending | - | - |
+| 1 (schema) | 2026-08-10 | In progress | Migration `20260810231207` applied; RLS/anon 401 verified; 4 private buckets created | Auth users, seed, app shell, client allowlist, app_config timezone pending |
 | 2 | - | pending | - | - |
 | 3 | - | pending | - | - |
 | 4 | - | pending | - | - |
