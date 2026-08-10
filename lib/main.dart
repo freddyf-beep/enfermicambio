@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/data/latest.dart' as timezone_data;
 
 import 'features/app/presentation/app_shell.dart';
+import 'features/auth/presentation/auth_gate.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load();
   timezone_data.initializeTimeZones();
+
+  await Supabase.initialize(
+    url: dotenv.env['SUPABASE_URL']!,
+    publishableKey: dotenv.env['SUPABASE_ANON_KEY']!,
+  );
+
   runApp(const EnfermicambioApp());
 }
 
@@ -23,7 +34,7 @@ class EnfermicambioApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const AppShell(),
+      home: const AuthGate(child: AppShell()),
     );
   }
 }

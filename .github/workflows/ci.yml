@@ -23,6 +23,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Prepare environment placeholders
+        run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
+        shell: pwsh
+
       - name: Verify formatting
         run: dart format --output=none --set-exit-if-changed lib test
 
@@ -55,6 +59,10 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Prepare environment placeholders
+        run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
+        shell: pwsh
+
       - name: Build debug APK
         run: flutter build apk --debug
 
@@ -83,6 +91,10 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Prepare environment placeholders
+        run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
+        shell: pwsh
 
       - name: Build iOS (no codesign)
         run: flutter build ios --debug --no-codesign
