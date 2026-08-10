@@ -9,12 +9,23 @@ class HealthPluginRepository implements HealthRepository {
   final Health _health;
   bool _configured = false;
 
+  static const _readTypes = <HealthDataType>[
+    HealthDataType.STEPS,
+    HealthDataType.ACTIVE_ENERGY_BURNED,
+    HealthDataType.DISTANCE_WALKING_RUNNING,
+    HealthDataType.EXERCISE_TIME,
+  ];
   @override
   Future<bool> requestStepReadPermission() async {
     await _configure();
     try {
       return await _health.requestAuthorization(
-        const [HealthDataType.STEPS],
+        const [
+          HealthDataType.STEPS,
+          HealthDataType.ACTIVE_ENERGY_BURNED,
+          HealthDataType.DISTANCE_WALKING_RUNNING,
+          HealthDataType.EXERCISE_TIME,
+        ],
         permissions: const [HealthDataAccess.READ],
       );
     } on Exception {
@@ -38,11 +49,11 @@ class HealthPluginRepository implements HealthRepository {
     );
     try {
       final points = await _health.getHealthDataFromTypes(
-        types: const [HealthDataType.STEPS],
+        types: _readTypes,
         startTime: localStart,
         endTime: localNow,
       );
-      final samples = points.map(_toStepSample).toList(growable: false);
+      final samples = points.map(_toSample).toList(growable: false);
       return HealthReadResult(
         status: samples.isEmpty
             ? HealthReadStatus.noData
@@ -85,10 +96,21 @@ class HealthPluginRepository implements HealthRepository {
     };
   }
 
-  HealthStepSample _toStepSample(HealthDataPoint point) {
+  HealthMetricType _mapType(HealthDataType type) {
+    return switch (type) {
+      HealthDataType.STEPS => HealthMetricType.steps,
+      HealthDataType.ACTIVE_ENERGY_BURNED => HealthMetricType.activeCalories,
+      HealthDataType.DISTANCE_WALKING_RUNNING => HealthMetricType.distance,
+      HealthDataType.EXERCISE_TIME => HealthMetricType.exerciseMinutes,
+      _ => HealthMetricType.steps,
+    };
+  }
+
+  HealthSample _toSample(HealthDataPoint point) {
     final value = point.value;
     final numericValue = value is NumericHealthValue ? value.numericValue : 0;
-    return HealthStepSample(
+    return HealthSample(
+      type: _mapType(point.type),
       value: numericValue.toDouble(),
       dateFrom: point.dateFrom,
       dateTo: point.dateTo,

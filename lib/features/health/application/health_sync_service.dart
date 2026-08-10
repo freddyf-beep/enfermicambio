@@ -62,11 +62,11 @@ class HealthSyncService {
     return DateTime(local.year, local.month, local.day);
   }
 
-  String? _firstSourceApp(List<HealthStepSample> samples) {
+  String? _firstSourceApp(List<HealthSample> samples) {
     return samples.isEmpty ? null : samples.first.sourceApp;
   }
 
-  String? _firstSourceDevice(List<HealthStepSample> samples) {
+  String? _firstSourceDevice(List<HealthSample> samples) {
     return samples.isEmpty ? null : samples.first.sourceDevice;
   }
 }

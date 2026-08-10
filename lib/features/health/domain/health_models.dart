@@ -9,8 +9,11 @@ enum HealthReadStatus {
   retryableFailure,
 }
 
-class HealthStepSample {
-  const HealthStepSample({
+enum HealthMetricType { steps, activeCalories, distance, exerciseMinutes }
+
+class HealthSample {
+  const HealthSample({
+    required this.type,
     required this.value,
     required this.dateFrom,
     required this.dateTo,
@@ -20,6 +23,7 @@ class HealthStepSample {
     this.sourceId,
   });
 
+  final HealthMetricType type;
   final double value;
   final DateTime dateFrom;
   final DateTime dateTo;
@@ -41,7 +45,7 @@ class HealthReadResult {
   });
 
   final HealthReadStatus status;
-  final List<HealthStepSample> samples;
+  final List<HealthSample> samples;
   final DateTime lastSyncedAt;
   final String sourcePlatform;
   final String? message;
@@ -54,6 +58,9 @@ class DailyActivityAggregate {
     required this.afternoonSteps,
     required this.nightSteps,
     required this.dailySteps,
+    required this.activeCalories,
+    required this.distanceMeters,
+    required this.exerciseMinutes,
     required this.syncedAt,
     required this.manualRecordsExcluded,
     this.sourcePlatform = 'unknown',
@@ -68,6 +75,9 @@ class DailyActivityAggregate {
   final int afternoonSteps;
   final int nightSteps;
   final int dailySteps;
+  final double activeCalories;
+  final double distanceMeters;
+  final double exerciseMinutes;
   final DateTime syncedAt;
   final int manualRecordsExcluded;
   final String sourcePlatform;
@@ -75,6 +85,35 @@ class DailyActivityAggregate {
   final String? sourceDevice;
   final String recordingMethod;
   final Map<String, dynamic> sourceMetadata;
+
+  DailyActivityAggregate copyWith({
+    int? morningSteps,
+    int? afternoonSteps,
+    int? nightSteps,
+    int? dailySteps,
+    double? activeCalories,
+    double? distanceMeters,
+    double? exerciseMinutes,
+    DateTime? syncedAt,
+  }) {
+    return DailyActivityAggregate(
+      date: date,
+      morningSteps: morningSteps ?? this.morningSteps,
+      afternoonSteps: afternoonSteps ?? this.afternoonSteps,
+      nightSteps: nightSteps ?? this.nightSteps,
+      dailySteps: dailySteps ?? this.dailySteps,
+      activeCalories: activeCalories ?? this.activeCalories,
+      distanceMeters: distanceMeters ?? this.distanceMeters,
+      exerciseMinutes: exerciseMinutes ?? this.exerciseMinutes,
+      syncedAt: syncedAt ?? this.syncedAt,
+      manualRecordsExcluded: manualRecordsExcluded,
+      sourcePlatform: sourcePlatform,
+      sourceApp: sourceApp,
+      sourceDevice: sourceDevice,
+      recordingMethod: recordingMethod,
+      sourceMetadata: sourceMetadata,
+    );
+  }
 }
 
 abstract interface class HealthRepository {

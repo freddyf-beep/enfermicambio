@@ -7,7 +7,7 @@ class ActivitySegmenter {
   const ActivitySegmenter();
 
   DailyActivityAggregate segment({
-    required Iterable<HealthStepSample> samples,
+    required Iterable<HealthSample> samples,
     required DateTime competitionDate,
     required String competitionTimezone,
     required CompetitionWindows windows,
@@ -27,6 +27,28 @@ class ActivitySegmenter {
     );
     final dayStart = localDate.toUtc();
     final dayEnd = localDate.add(const Duration(days: 1)).toUtc();
+
+    final stepSamples = samples
+        .where((sample) => sample.type == HealthMetricType.steps)
+        .toList(growable: false);
+    final activeCalories = _sumDaily(
+      samples.where((sample) => sample.type == HealthMetricType.activeCalories),
+      dayStart,
+      dayEnd,
+    );
+    final distanceMeters = _sumDaily(
+      samples.where((sample) => sample.type == HealthMetricType.distance),
+      dayStart,
+      dayEnd,
+    );
+    final exerciseMinutes = _sumDaily(
+      samples.where(
+        (sample) => sample.type == HealthMetricType.exerciseMinutes,
+      ),
+      dayStart,
+      dayEnd,
+    );
+
     final windowTotals = <String, double>{
       windows.morning.name: 0,
       windows.afternoon.name: 0,
@@ -35,7 +57,7 @@ class ActivitySegmenter {
     var dailyTotal = 0.0;
     var manualRecordsExcluded = 0;
 
-    for (final sample in samples) {
+    for (final sample in stepSamples) {
       if (sample.isManual) {
         manualRecordsExcluded++;
         continue;
@@ -120,6 +142,9 @@ class ActivitySegmenter {
       afternoonSteps: afternoonSteps,
       nightSteps: nightSteps,
       dailySteps: dailyTotal.round(),
+      activeCalories: activeCalories,
+      distanceMeters: distanceMeters,
+      exerciseMinutes: exerciseMinutes,
       syncedAt: syncedAt ?? DateTime.now().toUtc(),
       manualRecordsExcluded: manualRecordsExcluded,
       sourcePlatform: sourcePlatform,
@@ -128,6 +153,38 @@ class ActivitySegmenter {
       recordingMethod: recordingMethod,
       sourceMetadata: sourceMetadata,
     );
+  }
+
+  double _sumDaily(
+    Iterable<HealthSample> samples,
+    DateTime dayStart,
+    DateTime dayEnd,
+  ) {
+    var total = 0.0;
+    for (final sample in samples) {
+      if (sample.isManual) {
+        continue;
+      }
+      final start = sample.dateFrom.toUtc().isAfter(dayStart)
+          ? sample.dateFrom.toUtc()
+          : dayStart;
+      final end = sample.dateTo.toUtc().isBefore(dayEnd)
+          ? sample.dateTo.toUtc()
+          : dayEnd;
+      if (!start.isBefore(end)) {
+        continue;
+      }
+      final duration = sample.dateTo.difference(sample.dateFrom);
+      if (duration <= Duration.zero) {
+        total += sample.value;
+        continue;
+      }
+      total +=
+          sample.value *
+          end.difference(start).inMilliseconds /
+          duration.inMilliseconds;
+    }
+    return total;
   }
 
   bool _contains(
