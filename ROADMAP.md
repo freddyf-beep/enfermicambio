@@ -30,18 +30,18 @@ These apply to every phase. A phase cannot pass its checkpoint if any invariant 
 
 Goal: prove the single hardest dependency (automatic step reads on both platforms) before any broad UI, game, or social work.
 
-- [ ] 0.1 Confirm toolchain: Flutter SDK stable, Xcode with a paid-or-free Apple signing identity, Android SDK, Health Connect available on the Android test device, and a Supabase project with the CLI logged in.
-- [ ] 0.2 Create the minimal Flutter app with one screen: connect, sync, display today's totals per window, display `last_synced`.
-- [ ] 0.3 Evaluate Flutter health abstraction candidates (`health` plugin, CARP Health, ConnectKit) against: HealthKit support, Health Connect support, interval/windowed queries, per-record source metadata, manual-entry detection, workouts, route access, background delivery. Record the decision and rejected alternatives in the checkpoint note.
-- [ ] 0.4 Request only the permissions this spike needs (steps read on both platforms).
+- [~] 0.1 Confirm toolchain: Flutter SDK stable, Xcode with a paid-or-free Apple signing identity, Android SDK, Health Connect available on the Android test device, and a Supabase project with the CLI logged in. Flutter/Android SDK confirmed (2026-08-10); Xcode (Windows host) and Supabase CLI unavailable; devices pending.
+- [x] 0.2 Create the minimal Flutter app with one screen: connect, sync, display today's totals per window, display `last_synced`. Local evidence: `flutter analyze` clean, `flutter test` 2 passed, debug APK built. See `docs/checkpoint-0.md`.
+- [~] 0.3 Evaluate Flutter health abstraction candidates (`health` plugin, CARP Health, ConnectKit) against: HealthKit support, Health Connect support, interval/windowed queries, per-record source metadata, manual-entry detection, workouts, route access, background delivery. Record the decision and rejected alternatives in the checkpoint note. `health` selected provisionally; device validation pending.
+- [x] 0.4 Request only the permissions this spike needs (steps read on both platforms). Implemented in `HealthPluginRepository.requestStepReadPermission`.
 - [ ] 0.5 Read today's steps on one physical iPhone and one physical Android phone.
-- [ ] 0.6 Filter out records the platform flags as manually entered; log the filter decision with source metadata for diagnostics.
+- [x] 0.6 Filter out records the platform flags as manually entered; log the filter decision with source metadata for diagnostics. Unit tested.
 - [ ] 0.7 Use platform aggregation APIs (not naive raw-record summation) so phone + wearable overlap does not double count. Document the aggregation strategy per platform.
-- [ ] 0.8 Split accepted steps into `morning_steps` (06:00-12:00), `afternoon_steps` (12:00-18:00), `night_steps` (18:00-24:00), `daily_steps` using `competition_timezone`, with window boundaries read from config.
-- [ ] 0.9 Create the `daily_activity` table (migration 0001) with `unique(user_id, date)` and upsert one aggregate row per user per day.
-- [ ] 0.10 Store diagnostic source metadata (`platform`, `source_app`, `source_device`, `recording_method`, `manual_entry_detected`) in a side table or JSONB column, kept out of the normal UI.
+- [x] 0.8 Split accepted steps into `morning_steps` (06:00-12:00), `afternoon_steps` (12:00-18:00), `night_steps` (18:00-24:00), `daily_steps` using `competition_timezone`, with window boundaries read from config. Unit tested at boundaries.
+- [~] 0.9 Create the `daily_activity` table (migration 0001) with `unique(user_id, date)` and upsert one aggregate row per user per day. Migration written; not yet applied (no Supabase CLI/Postgres locally).
+- [x] 0.10 Store diagnostic source metadata (`platform`, `source_app`, `source_device`, `recording_method`, `manual_entry_detected`) in a side table or JSONB column, kept out of the normal UI. In migration 0001 and the sync pipeline.
 - [ ] 0.11 Validation day: on each device, record the platform health app's displayed total, the app's accepted total, known manual entries, and the delta. Any material discrepancy is investigated and explained in the checkpoint note.
-- [ ] 0.12 Show visible states: syncing, success with `last_synced`, permission denied, health service unavailable, no data.
+- [x] 0.12 Show visible states: syncing, success with `last_synced`, permission denied, health service unavailable, no data. Implemented in the spike screen.
 
 Dependencies: physical iPhone and Android phone; Supabase project; test Apple/Google signing.
 
@@ -310,7 +310,7 @@ Append entries here as phases complete. Do not delete history.
 
 | Checkpoint | Date | Result | Evidence | Known limitations |
 | --- | --- | --- | --- | --- |
-| 0 | - | pending | - | - |
+| 0 | 2026-08-10 | In progress | `flutter analyze` clean; `flutter test` 2 passed; debug APK built; `docs/checkpoint-0.md` | Device validation (0.5/0.7/0.11), Xcode, Supabase CLI pending |
 | 1 | - | pending | - | - |
 | 2 | - | pending | - | - |
 | 3 | - | pending | - | - |

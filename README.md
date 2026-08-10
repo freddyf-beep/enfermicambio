@@ -112,7 +112,7 @@ Core data rules:
 
 ## Setup
 
-The application code does not exist yet. When it does, the expected shape is:
+A Flutter scaffold with the Phase 0 health spike foundation exists in `lib/`. The full product is not built yet. Current commands:
 
 ```powershell
 flutter pub get
@@ -135,6 +135,6 @@ Requirements: Flutter stable, Xcode with signing for the iPhones, Android SDK wi
 
 ## Development Status
 
-Documentation only. Delivery starts with the Phase 0 cross-platform health spike in `ROADMAP.md`: one Flutter screen that reads today's automatic steps on one iPhone and one Android phone, excludes detectable manual entries, segments them into competition windows, and upserts the aggregate to Supabase. Nothing else is built until that works.
+Phase 0 in progress. A Flutter scaffold with the health spike foundation exists: automatic step read behind a repository interface, manual-entry filtering, `competition_timezone` window segmentation, and the `daily_activity` upsert pipeline backed by migration 0001. Local verification passes (`flutter analyze`, `flutter test`, debug APK build); device validation on physical iPhone and Android, Supabase integration, and the aggregation strategy still need evidence as tracked in `ROADMAP.md` and `docs/checkpoint-0.md`.
 
 See `ROADMAP.md` for the phase plan and checkpoint log, `CODESTYLE.md` for engineering rules, and `SPECS.md` for the full product definition.
