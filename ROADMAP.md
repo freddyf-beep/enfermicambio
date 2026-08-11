@@ -177,7 +177,7 @@ Goal: the four users follow the day through a shared, low-noise timeline.
 - [ ] 4.7 Rate-limit leader-change events: publish only if the lead change persists for the configured cooldown window; at most one per pair per window.
 - [ ] 4.8 Wire Supabase Realtime for posts, comments, reactions, ranking updates, mission and achievement events. On reconnect, re-fetch from the database rather than trusting the stream.
 - [ ] 4.9 Push notifications via FCM/APNs with per-user preference categories: overtakes, round endings, achievements, workouts, comments/reactions, missions, season results. Copy tone per `SPECS.md` section 68: playful, never medical or shame-oriented.
-- [x] 4.10 System posts are insertable only by the service role; clients cannot forge them (RLS + `system_generated` guard). RLS policy `posts_insert_allowlisted` forces `system_generated = false` for clients in migration 0002 (2026-08-11).
+- [x] 4.10 System posts are insertable only by the service role; clients cannot forge them (RLS + `system_generated` guard). RLS policy `posts_insert_allowlisted` forces `system_generated = false` for clients in migration 0002; verified live: a client POST with `system_generated=true` returns 403 (2026-08-11).
 
 Dependencies: Phases 1 and 3.
 
