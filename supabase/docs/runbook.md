@@ -78,3 +78,53 @@ A user switches phones:
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `COMPETITION_TZ`: local `.env` (git-ignored), placeholders only in `.env.example`.
 - `SERVICE_ROLE_KEY`: local shell variable for `supabase/scripts/provision_user.js`; CI secret where needed.
 - Game tuning: `app_config` table (service-role write); no redeploy required.
+
+## Release
+
+### Android
+
+The CI workflow `ci.yml` builds a debug APK on every push; download it from the Actions run's artifacts. For a distributable release, a signed release APK/AAB requires a keystore:
+
+1. Generate a keystore (once) and store it as a GitHub secret (`ANDROID_KEYSTORE`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_PASSWORD`, `ANDROID_KEY_ALIAS`).
+2. Reference it in `android/app/build.gradle.kts` via the secrets.
+3. Extend `ci.yml` to run `flutter build apk --release` and upload the artifact.
+
+### iOS (sideload, free Apple ID)
+
+The `build-ipa.yml` workflow builds an unsigned IPA for sideloading with Sideloadly/AltStore. The build is valid for 7 days under a free Apple ID.
+
+1. From the Actions run, download the `enfermicambio-ipa` artifact.
+2. Unzip and open `Enfermicambio.ipa` in Sideloadly.
+3. Enter the free Apple ID and an app-specific password; install to the registered iPhone.
+4. Reinstall (same process) when the 7-day certificate expires.
+
+### Release checklist (Phase 7.7)
+
+Run against release builds on the target devices:
+
+1. All four known users authenticate; unknown users read nothing.
+2. No manual step entry UI exists anywhere.
+3. Automatic steps read on HealthKit and Health Connect.
+4. Daily steps split into morning/afternoon/night; repeated syncs never inflate totals.
+5. Rankings show all four users with last-sync freshness.
+6. Workouts sync automatically where available; outdoor routes render on the map.
+7. Food logging works (scan/search/custom), daily calories and macros correct.
+8. Posts, photos, comments, and reactions publish and appear in the shared feed.
+9. Automatic feed events appear without spam.
+10. Streaks, achievements, and missions are calculated.
+11. Season points are awarded without duplicates; season close crowns a champion.
+12. Offline: cached reads useful; queued writes replay on reconnect.
+13. No public buckets; private media is not fetchable without auth.
+14. Backup restore was tested into a clean project.
+
+### Backup verification
+
+- Confirm the Supabase automatic backup schedule in the dashboard (Database -> Backups).
+- On a paid plan, enable PITR before release.
+- Test an actual restore into a fresh project and confirm `supabase migration list` and a sample query.
+
+### Rollback
+
+- Migrations are forward-only; corrective changes are new migrations.
+- Data damage recovery: restore from backup, then replay immutable records (ledger entries are append-only and safe to recompute for open seasons).
+- App: reinstall a previous artifact (GitHub Actions retains artifacts for 30 days by default).

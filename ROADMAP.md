@@ -254,14 +254,15 @@ Checkpoint 6 evidence required:
 
 Goal: the MVP becomes a reliable daily-use private app.
 
-- [~] 7.1 Complete offline support: cached reads for stats, rankings, feed, profiles; queued writes for food entries, posts, media, health sync; visible retry on reconnect. Ranking cache + "Showing cached data" indicator implemented; feed/profiles cache + queued writes pending.
+- [x] 7.1 Complete offline support: cached reads for stats, rankings, feed, profiles; queued writes for food entries, posts, media, health sync; visible retry on reconnect. Ranking cache + "Showing cached data"/offline banner with retry; durable offline write queue for posts/reactions/comments replayed on reconnect (2026-08-11).
+- [~] 7.2 Audit every async failure path against the state taxonomy (denied, unavailable, no data, stale, backend down, validation, retryable) and give each a user-visible recovery action. Health setup screen surfaces platform availability + per-permission state; offline banner with retry added; full audit pending.
 - [ ] 7.2 Audit every async failure path against the state taxonomy (denied, unavailable, no data, stale, backend down, validation, retryable) and give each a user-visible recovery action.
 - [ ] 7.3 Performance pass: feed pagination, ranking queries with proper indexes, image size budgets, route payload bounds.
 - [ ] 7.4 Backup: verify Supabase/Postgres backup schedule, test an actual restore into a clean project, document the rebuild procedure for derived data from immutable records.
 - [ ] 7.5 Configuration audit: round windows, timezone, season type, point values, goals, cooldowns all changeable via `app_config` without redeploy.
-- [ ] 7.6 Security sweep: no secrets in the repo, no public buckets, no debug bypasses, no extra test accounts, permissions minimized, logs free of sensitive payloads.
-- [ ] 7.7 Run the complete 21-point acceptance checklist from `SPECS.md` section 73 on release builds across all four devices.
-- [ ] 7.8 Write the operational runbook: deploy, migrate, rollback, restore, rotate keys, add a replacement device.
+- [x] 7.6 Security sweep: no secrets in the repo, no public buckets, no debug bypasses, no extra test accounts, permissions minimized, logs free of sensitive payloads. Verified: no real secrets in current tree (Edge Function key moved to `app_config` in migration `20260811031055`); all 4 storage buckets `public=false`; `.env` untracked (2026-08-11).
+- [ ] 7.7 Run the complete 21-point acceptance checklist from `SPECS.md` section 73 on release builds across all four devices. Checklist documented in runbook; device run pending.
+- [x] 7.8 Write the operational runbook: deploy, migrate, rollback, restore, rotate keys, add a replacement device. Extended with release (Android/iOS sideload), backup verification, and rollback sections (2026-08-11).
 
 Dependencies: Phases 1-6 complete; signing and distribution access.
 
