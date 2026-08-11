@@ -135,6 +135,4 @@ Requirements: Flutter stable, Xcode with signing for the iPhones, Android SDK wi
 
 ## Development Status
 
-Phase 0 in progress. A Flutter scaffold with the health spike foundation exists: automatic step read behind a repository interface, manual-entry filtering, `competition_timezone` window segmentation, and the `daily_activity` upsert pipeline backed by migration 0001. Local verification passes (`flutter analyze`, `flutter test`, debug APK build); device validation on physical iPhone and Android, Supabase integration, and the aggregation strategy still need evidence as tracked in `ROADMAP.md` and `docs/checkpoint-0.md`.
-
-See `ROADMAP.md` for the phase plan and checkpoint log, `CODESTYLE.md` for engineering rules, and `SPECS.md` for the full product definition.
+In active development. The backend schema (Phases 0-1) is applied to the remote Supabase project: `profiles`, `daily_activity`, full Phase 1 schema with RLS, private storage buckets, the `award_points` ledger, and standings. The Flutter app has a five-tab shell, Google/email sign-in, the HOY dashboard with live rankings and feed, RANKING with freshness indicators, REGISTRAR actions, JUEGO season standings, NOSOTROS profiles, health sync (steps + calories + distance + exercise) with offline ranking cache, nutrition domain with Open Food Facts resolution, and workout de-duplication. See `ROADMAP.md` for the phase plan, `CODESTYLE.md` for engineering rules, and `SPECS.md` for the full product definition. Device validation and full acceptance still require physical iPhone/Android testing.
