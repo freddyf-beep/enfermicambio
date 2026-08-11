@@ -52,11 +52,15 @@ class _HealthSetupScreenState extends State<HealthSetupScreen> {
     setState(() {
       _requesting = false;
     });
+    final healthUnavailable = _snapshot?.healthAvailable == false;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
           granted
               ? 'Health permissions granted.'
+              : healthUnavailable
+              ? 'The health service is not available on this device. '
+                    'Open Health Connect and try again.'
               : 'Health permissions were not granted.',
         ),
       ),

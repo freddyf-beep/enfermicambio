@@ -1,12 +1,18 @@
+import 'dart:async';
+
 import 'package:health/health.dart';
 import 'package:timezone/timezone.dart' as timezone;
 
 import '../domain/health_models.dart';
 
 class HealthPluginRepository implements HealthRepository {
-  HealthPluginRepository({Health? health}) : _health = health ?? Health();
+  HealthPluginRepository({
+    Health? health,
+    this.permissionTimeout = const Duration(seconds: 20),
+  }) : _health = health ?? Health();
 
   final Health _health;
+  final Duration permissionTimeout;
   bool _configured = false;
 
   static const _readTypes = <HealthDataType>[
@@ -17,17 +23,21 @@ class HealthPluginRepository implements HealthRepository {
   ];
   @override
   Future<bool> requestStepReadPermission() async {
-    await _configure();
     try {
-      return await _health.requestAuthorization(
-        const [
-          HealthDataType.STEPS,
-          HealthDataType.ACTIVE_ENERGY_BURNED,
-          HealthDataType.DISTANCE_WALKING_RUNNING,
-          HealthDataType.EXERCISE_TIME,
-        ],
-        permissions: const [HealthDataAccess.READ],
-      );
+      await _configure();
+      return await _health
+          .requestAuthorization(
+            const [
+              HealthDataType.STEPS,
+              HealthDataType.ACTIVE_ENERGY_BURNED,
+              HealthDataType.DISTANCE_WALKING_RUNNING,
+              HealthDataType.EXERCISE_TIME,
+            ],
+            permissions: const [HealthDataAccess.READ],
+          )
+          .timeout(permissionTimeout);
+    } on TimeoutException {
+      return false;
     } on Exception {
       return false;
     }
@@ -83,12 +93,14 @@ class HealthPluginRepository implements HealthRepository {
 
   @override
   Future<HealthSetupSnapshot> readSetupStatus() async {
-    await _configure();
     final platform = _platformName;
     try {
+      await _configure();
       final granted = <HealthMetricType>{};
       for (final type in _readTypes) {
-        final has = await _health.hasPermissions([type]);
+        final has = await _health
+            .hasPermissions([type])
+            .timeout(permissionTimeout);
         if (has == true) {
           granted.add(_mapType(type));
         }
@@ -98,6 +110,13 @@ class HealthPluginRepository implements HealthRepository {
         healthAvailable: true,
         grantedTypes: granted,
         message: null,
+      );
+    } on TimeoutException catch (error) {
+      return HealthSetupSnapshot(
+        platform: platform,
+        healthAvailable: false,
+        grantedTypes: const {},
+        message: 'Timed out waiting for the health service: $error',
       );
     } on Exception catch (error) {
       return HealthSetupSnapshot(
@@ -111,12 +130,16 @@ class HealthPluginRepository implements HealthRepository {
 
   @override
   Future<bool> requestAllPermissions() async {
-    await _configure();
     try {
-      return await _health.requestAuthorization(
-        _readTypes,
-        permissions: const [HealthDataAccess.READ],
-      );
+      await _configure();
+      return await _health
+          .requestAuthorization(
+            _readTypes,
+            permissions: const [HealthDataAccess.READ],
+          )
+          .timeout(permissionTimeout);
+    } on TimeoutException {
+      return false;
     } on Exception {
       return false;
     }
@@ -126,7 +149,7 @@ class HealthPluginRepository implements HealthRepository {
     if (_configured) {
       return;
     }
-    await _health.configure();
+    await _health.configure().timeout(permissionTimeout);
     _configured = true;
   }
 
