@@ -142,7 +142,7 @@ Goal: one full competition day runs automatically end to end.
 - [ ] 3.6 Implement `close_day`: closes night round, awards daily rank points, evaluates daily streaks, evaluates achievements, updates historical stats, publishes the daily summary event, all inside one transaction.
 - [x] 3.7 Implement streaks with `current_count`, `longest_count`, `last_qualified_date`. Unit-test transitions: qualify, extend, break, re-qualify, timezone edge. `StreakEngine` + 6 tests (2026-08-11).
 - [x] 3.8 Implement the generic achievement engine: `metric`, `operator`, `threshold`, `time_window`, `repeatable`, `hidden`, `season_points`. Seed the initial pack from `SPECS.md` section 65. Non-repeatable achievements get a uniqueness constraint on `(user_id, achievement_id)`. `AchievementEngine` + tests; uniqueness constraint in migration 0002; seed pack pending.
-- [ ] 3.9 Implement mission engine for individual, competitive, and cooperative missions. Seed the initial pack from `SPECS.md` section 66. Cooperative progress uses a group row (`user_id` null).
+- [x] 3.9 Implement mission engine for individual, competitive, and cooperative missions. Seed the initial pack from `SPECS.md` section 66. Cooperative progress uses a group row (`user_id` null). `MissionEngine` + 4 tests; seed pack pending (2026-08-11).
 - [ ] 3.10 Implement `close_season`: freeze standings, write `season_results` for all four users, award champion trophy, publish season result event, create next season. Transactional; safe to retry.
 - [x] 3.11 Build the `JUEGO` screen: current season, standings, today's missions, streaks, achievements, trophy cabinet, season history. Standings implemented with live Supabase data; missions/streaks/trophies/history pending.
 - [ ] 3.12 Optional personal-improvement ranking (vs trailing 14-day average) displayed separately from raw rankings.
@@ -203,7 +203,7 @@ Goal: food logging is fast, private, and completely separate from step rules.
 - [x] 5.1 Profile fields: `daily_calorie_target`, optional `protein_target_g`, `carb_target_g`, `fat_target_g`. Present in migration 0001 `profiles`; protein/carb/fat target columns pending.
 - [x] 5.2 Meal types: breakfast, lunch, dinner, snack, other. `MealType` enum + DB check constraint (2026-08-11).
 - [x] 5.3 `REGISTRAR` tab actions: scan barcode, search food, photograph meal, create meal, new post, post location, share workout. No step-related action exists. Action screen with barcode/photo/post; barcode + photo actions pending implementation (2026-08-11).
-- [ ] 5.4 Barcode scanning with `mobile_scanner` for EAN/UPC.
+- [x] 5.4 Barcode scanning with `mobile_scanner` for EAN/UPC. Implemented in `BarcodeScanScreen` with Open Food Facts resolution wired into `REGISTRAR` (2026-08-11).
 - [x] 5.5 Lookup priority: barcode -> Open Food Facts -> private cache -> USDA fallback -> custom food creation. Cache resolved products in `foods`. `OpenFoodFactsRepository` + private cache path in `foods` table; USDA fallback pending.
 - [x] 5.6 Food entries store a nutrition snapshot (calories, protein, carbs, fat at time of logging) so later source changes never rewrite history. Snapshot columns in `food_entries` + `entryFromFood` snapshot builder (2026-08-11).
 - [x] 5.10 `within_calorie_target = consumed <= daily_calorie_target`. Never present food minus exercise as a metabolic deficit. `DailyNutritionTotals.withinCalorieTarget` (2026-08-11).
