@@ -1,16 +1,23 @@
 name: build-ipa
 
-# Generates a signed iOS IPA for physical-device testing.
+# Generates a signed iOS IPA for physical-device testing using fastlane match.
+# Works with a free Apple developer account (Personal Team); the resulting
+# development build installs on the registered device for up to 7 days.
 #
 # Required repository secrets (Settings -> Secrets and variables -> Actions):
-#   IOS_CERTIFICATE             base64 of a .p12 signing certificate
-#   IOS_CERTIFICATE_PASSWORD    password for that .p12
-#   IOS_PROVISIONING_PROFILE    base64 of a .mobileprovision that includes the
-#                               target iPhone's UDID
-#   IOS_BUNDLE_IDENTIFIER       com.enfermicambio.enfermicambio (optional)
+#   MATCH_GIT_URL           URL of the private git repo holding certificates
+#                           (e.g. https://github.com/you/ios-certificates)
+#   MATCH_PASSWORD          password used to encrypt the match repo
+#   FASTLANE_USER           Apple ID email
+#   FASTLANE_PASSWORD       Apple ID password, or an app-specific password
+#   MATCH_GIT_BASIC_AUTHORIZATION
+#                           base64 "user:token" to access the private repo
+#   TEAM_ID                 your Apple developer team ID (optional)
 #
-# When these secrets are not set, the job is skipped and the unsigned CI build
-# (ci.yml) still verifies compilation.
+# First-time setup (run once, from a Mac with Xcode):
+#   fastlane match init --git_url <MATCH_GIT_URL> --type development
+#   fastlane match development
+#   fastlane match development --readonly   # verify
 
 on:
   push:
@@ -24,10 +31,10 @@ on:
 
 jobs:
   build-ipa:
-    name: Build signed IPA
+    name: Build signed IPA (fastlane match)
     runs-on: macos-latest
     timeout-minutes: 45
-    if: ${{ secrets.IOS_CERTIFICATE != '' && secrets.IOS_PROVISIONING_PROFILE != '' }}
+    if: ${{ secrets.MATCH_GIT_URL != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,39 +52,47 @@ jobs:
         run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
         shell: pwsh
 
-      - name: Import signing certificate
-        env:
-          IOS_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
-          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+      - name: Install fastlane
         run: |
-          CERT_PATH=$RUNNER_TEMP/build_certificate.p12
-          echo -n "$IOS_CERTIFICATE" | base64 --decode --output $CERT_PATH
-          KEYCHAIN=$RUNNER_TEMP/app-signing.keychain-db
-          security create-keychain -p "$IOS_CERTIFICATE_PASSWORD" $KEYCHAIN
-          security default-keychain -s $KEYCHAIN
-          security unlock-keychain -p "$IOS_CERTIFICATE_PASSWORD" $KEYCHAIN
-          security import $CERT_PATH -P "$IOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$IOS_CERTIFICATE_PASSWORD" $KEYCHAIN
+          gem install fastlane
+          fastlane --version
 
-      - name: Install provisioning profile
+      - name: Match development certificates
         env:
-          IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
+          FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
+          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
         run: |
-          PROVISIONING_PATH=$RUNNER_TEMP/build.mobileprovision
-          echo -n "$IOS_PROVISIONING_PROFILE" | base64 --decode --output $PROVISIONING_PATH
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PROVISIONING_PATH ~/Library/MobileDevice/Provisioning\ Profiles/build.mobileprovision
+          MATCH_ARGS="--readonly --type development --app_identifier com.enfermicambio.enfermicambio"
+          if [ -n "$TEAM_ID" ]; then
+            MATCH_ARGS="$MATCH_ARGS --team_id $TEAM_ID"
+          fi
+          fastlane match development $MATCH_ARGS
+          # Add the team to the Xcode project so signing resolves automatically.
+          /usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" \
+            ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null \
+            | head -1
+          echo "Provisioning profiles installed:"
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/ | head -5
 
-      - name: Build iOS app (signed)
-        run: flutter build ios --release --no-codesign
+      - name: Build iOS app (archive)
+        env:
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+        run: |
+          if [ -n "$TEAM_ID" ]; then
+            sed -i '' \
+              "s/PRODUCT_BUNDLE_IDENTIFIER = com.enfermicambio.enfermicambio;/PRODUCT_BUNDLE_IDENTIFIER = com.enfermicambio.enfermicambio;\n\t\t\t\tDEVELOPMENT_TEAM = $TEAM_ID;/" \
+              ios/Runner.xcodeproj/project.pbxproj
+          fi
+          flutter build ios --release --no-codesign
 
       - name: Export signed IPA
         env:
-          IOS_BUNDLE_IDENTIFIER: ${{ secrets.IOS_BUNDLE_IDENTIFIER }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
         run: |
-          if [ -z "$IOS_BUNDLE_IDENTIFIER" ]; then
-            IOS_BUNDLE_IDENTIFIER="com.enfermicambio.enfermicambio"
-          fi
           EXPORT_OPTIONS=$RUNNER_TEMP/ExportOptions.plist
           cat > "$EXPORT_OPTIONS" <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -85,15 +100,15 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>ad-hoc</string>
+            <string>development</string>
             <key>signingStyle</key>
-            <string>manual</string>
+            <string>automatic</string>
             <key>stripSwiftSymbols</key>
             <true/>
             <key>compileBitcode</key>
             <false/>
             <key>teamID</key>
-            <string></string>
+            <string>${TEAM_ID:-}</string>
           </dict>
           </plist>
           EOF
@@ -110,8 +125,7 @@ jobs:
 
       - name: Show signing identity
         run: |
-          echo "Certificate identity:"
-          security find-identity -v -p codesigning $RUNNER_TEMP/app-signing.keychain-db
-          echo "Provisioning profile:"
-          security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/build.mobileprovision \
-            | grep -E 'UUID|ExpirationDate|TeamName|Name' | head -10
+          security find-identity -v -p codesigning
+          echo "Installed profiles:"
+          security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision \
+            2>/dev/null | grep -E 'UUID|ExpirationDate|TeamName|Name' | head -10
