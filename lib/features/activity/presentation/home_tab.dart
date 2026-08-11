@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../app/data/dashboard_cache.dart';
+import '../../feed/domain/feed_models.dart';
 import '../../feed/presentation/feed_list.dart';
 import '../../health/domain/health_models.dart';
 import '../../ranking/domain/ranking_models.dart';
@@ -19,12 +22,31 @@ class _HomeTabState extends State<HomeTab> {
   late final DashboardRepository _repository;
   AppDashboardData? _data;
   AsyncViewStatus? _status;
+  DashboardCache? _cache;
+  bool _showingCache = false;
 
   @override
   void initState() {
     super.initState();
     _repository = DashboardRepository(client: Supabase.instance.client);
-    _load();
+    _init();
+  }
+
+  Future<void> _init() async {
+    final prefs = await SharedPreferences.getInstance();
+    _cache = DashboardCache(prefs);
+    final cached = _cache!.readRanking();
+    if (cached != null && mounted) {
+      setState(() {
+        _data ??= AppDashboardData(
+          ranking: cached,
+          feedPage: const FeedPage(posts: [], nextCursor: null),
+          me: null,
+        );
+        _showingCache = true;
+      });
+    }
+    await _load();
   }
 
   Future<void> _load() async {
@@ -34,8 +56,11 @@ class _HomeTabState extends State<HomeTab> {
     try {
       final data = await _repository.load(now: DateTime.now().toUtc());
       if (!mounted) return;
+      await _cache?.writeRanking(data.ranking);
+      await _cache?.writeLastSync(DateTime.now().toUtc());
       setState(() {
         _data = data;
+        _showingCache = false;
       });
     } on Exception catch (error) {
       if (!mounted) return;
@@ -71,6 +96,15 @@ class _HomeTabState extends State<HomeTab> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           children: [
+            if (_showingCache) ...[
+              Text(
+                'Showing cached data',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
             Text('Today', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 8),
             _SummaryCard(aggregate: data.me),
