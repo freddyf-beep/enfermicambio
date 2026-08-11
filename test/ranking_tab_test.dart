@@ -41,7 +41,9 @@ void main() {
       ),
     ];
 
-    await tester.pumpWidget(MaterialApp(home: RankingTab(rows: rows)));
+    await tester.pumpWidget(
+      MaterialApp(home: RankingTab(rows: rows, loadFromBackend: false)),
+    );
 
     expect(find.text('Diego'), findsOneWidget);
     expect(find.text('Nico'), findsOneWidget);
@@ -49,11 +51,13 @@ void main() {
     expect(find.text('Juan'), findsOneWidget);
     expect(find.textContaining('stale'), findsOneWidget);
     expect(find.text('no data yet'), findsOneWidget);
-    expect(find.text('9,800'), findsOneWidget);
+    expect(find.text('9.8k'), findsOneWidget);
   });
 
-  testWidgets('shows empty state when no rows', (tester) async {
-    await tester.pumpWidget(const MaterialApp(home: RankingTab()));
+  testWidgets('shows empty state when the ranking has no rows', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(home: RankingTab(rows: const [], loadFromBackend: false)),
+    );
     expect(find.textContaining('rankings will appear'), findsOneWidget);
   });
 }
