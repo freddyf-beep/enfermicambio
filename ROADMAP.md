@@ -103,7 +103,7 @@ Checkpoint 1 evidence required:
 Goal: trustworthy automatic activity data powering the four daily competitions.
 
 - [x] 2.1 Promote the Phase 0 spike into a reusable `health` feature module with a platform-agnostic repository interface and per-platform adapters. `HealthRepository` interface with `HealthPluginRepository` adapter; UI/domain isolated from HealthKit/Health Connect types (2026-08-11).
-- [ ] 2.2 Define the sync trigger set: app open, foreground resume, manual pull-to-refresh, OS background refresh (best effort), platform data notifications where supported. Never promise real-time sync.
+- [x] 2.2 Define the sync trigger set: app open, foreground resume, manual pull-to-refresh, OS background refresh (best effort), platform data notifications where supported. Never promise real-time sync. App open + foreground resume wired via `HealthSyncBootstrap` + lifecycle observer; pull-to-refresh already present (2026-08-11). OS background refresh/notifications pending.
 - [x] 2.3 Extend ingestion to active calories, distance, and exercise minutes where the platform exposes them. `HealthMetricType` covers steps, active calories, distance, exercise minutes; unit tested (2026-08-11).
 - [x] 2.4 Implement the segmentation service as pure Dart: input records + timezone + windows, output per-window aggregates. Unit-test boundary records at exactly 06:00, 12:00, 18:00, 00:00 and DST transitions in the competition timezone. Boundary tests at 06:00/12:00/18:00/00:00 and early-morning (00:00-06:00) added (2026-08-11).
 - [~] 2.5 Sync pipeline: read -> filter manual -> aggregate per platform semantics -> segment -> upsert `(user_id, date)` -> update `synced_at`. Make every step retryable. Pipeline implemented in `HealthSyncService`; retry/queue pending.
