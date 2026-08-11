@@ -7,7 +7,10 @@ import '../../profiles/presentation/about_tab.dart';
 import '../../ranking/presentation/ranking_tab.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key});
+  const AppShell({super.key, this.tabs});
+
+  /// The five product tabs. Overridable for tests and dependency injection.
+  final List<Widget>? tabs;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -16,18 +19,19 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
 
-  static const _tabs = <Widget>[
-    HomeTab(),
-    RankingTab(),
-    RegisterTab(),
-    GameTab(),
-    AboutTab(),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final tabs =
+        widget.tabs ??
+        const <Widget>[
+          HomeTab(),
+          RankingTab(),
+          RegisterTab(),
+          GameTab(),
+          AboutTab(),
+        ];
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: _tabs),
+      body: IndexedStack(index: _selectedIndex, children: tabs),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {

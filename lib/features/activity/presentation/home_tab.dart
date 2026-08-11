@@ -1,42 +1,89 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../feed/presentation/feed_list.dart';
 import '../../health/domain/health_models.dart';
 import '../../ranking/domain/ranking_models.dart';
-import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
+import '../../../shared/ui/async_state_view.dart';
+import '../../app/data/dashboard_repository.dart';
 
-class HomeTab extends StatelessWidget {
-  const HomeTab({super.key, this.aggregate, this.ranking = const []});
+class HomeTab extends StatefulWidget {
+  const HomeTab({super.key});
 
-  final DailyActivityAggregate? aggregate;
-  final List<RankingRow> ranking;
+  @override
+  State<HomeTab> createState() => _HomeTabState();
+}
+
+class _HomeTabState extends State<HomeTab> {
+  late final DashboardRepository _repository;
+  AppDashboardData? _data;
+  AsyncViewStatus? _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = DashboardRepository(client: Supabase.instance.client);
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _status = null;
+    });
+    try {
+      final data = await _repository.load(now: DateTime.now().toUtc());
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+      });
+    } on Exception catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _status = _data == null
+            ? AsyncViewStatus.backendError(error.toString())
+            : AsyncViewStatus.offline(
+                'Could not refresh. Showing the last saved data.',
+              );
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (aggregate == null) {
+    if (_data == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('HOY')),
-        body: const AsyncStateView(
-          status: AsyncViewStatus.empty(
-            'Your daily summary and the four-person ranking will appear here.',
-          ),
+        body: AsyncStateView(
+          status: _status ?? const AsyncViewStatus.loading(),
+          onRetry: _load,
+          child: const SizedBox(),
         ),
       );
     }
+
+    final data = _data!;
     return Scaffold(
       appBar: AppBar(title: const Text('HOY')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text('Today', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 12),
-          _SummaryCard(aggregate: aggregate!),
-          const SizedBox(height: 24),
-          Text('Ranking', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          for (final row in ranking) _RankingRowTile(row: row),
-        ],
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text('Today', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            _SummaryCard(aggregate: data.me),
+            const SizedBox(height: 24),
+            Text('Ranking', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            for (final row in data.ranking) _RankingRowTile(row: row),
+            const SizedBox(height: 24),
+            Text('Feed', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            FeedList(posts: data.feedPage.posts),
+          ],
+        ),
       ),
     );
   }
@@ -45,24 +92,32 @@ class HomeTab extends StatelessWidget {
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.aggregate});
 
-  final DailyActivityAggregate aggregate;
+  final DailyActivityAggregate? aggregate;
 
   @override
   Widget build(BuildContext context) {
+    if (aggregate == null) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text('Connect a health source to see your daily summary.'),
+        ),
+      );
+    }
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Metric(label: 'Steps', value: aggregate.dailySteps),
-            _Metric(label: 'Active kcal', value: aggregate.activeCalories),
+            _Metric(label: 'Steps', value: aggregate!.dailySteps),
+            _Metric(label: 'Active kcal', value: aggregate!.activeCalories),
             _Metric(
               label: 'Distance',
-              value: aggregate.distanceMeters,
+              value: aggregate!.distanceMeters,
               unit: 'm',
             ),
-            _Metric(label: 'Exercise min', value: aggregate.exerciseMinutes),
+            _Metric(label: 'Exercise min', value: aggregate!.exerciseMinutes),
           ],
         ),
       ),
@@ -87,12 +142,19 @@ class _Metric extends StatelessWidget {
         children: [
           Text(label),
           Text(
-            '${NumberFormat.decimalPattern().format(value)} $suffix',
+            '${_format(value)} $suffix',
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
         ],
       ),
     );
+  }
+
+  String _format(num value) {
+    if (value >= 1000) {
+      return '${(value / 1000).toStringAsFixed(1)}k';
+    }
+    return value.toStringAsFixed(value % 1 == 0 ? 0 : 1);
   }
 }
 
@@ -115,9 +177,16 @@ class _RankingRowTile extends StatelessWidget {
       leading: CircleAvatar(child: Text('${row.rank}')),
       title: Text('${row.displayName}$freshness'),
       trailing: Text(
-        NumberFormat.decimalPattern().format(row.value),
+        _format(row.value),
         style: const TextStyle(fontWeight: FontWeight.w700),
       ),
     );
+  }
+
+  String _format(double value) {
+    if (value >= 1000) {
+      return '${(value / 1000).toStringAsFixed(1)}k';
+    }
+    return value.toStringAsFixed(0);
   }
 }
