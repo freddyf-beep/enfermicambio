@@ -174,8 +174,8 @@ Goal: the four users follow the day through a shared, low-noise timeline.
 - [x] 4.4 Reactions: fixed emoji set, one reaction per `(post_id, user_id, emoji)`, toggle to remove. Reaction button + count in feed cards; upsert via PK (2026-08-11). Toggle-to-remove pending.
 - [x] 4.5 Comments: flat list, author, timestamp, delete-own only. Comment composer + count in feed cards (2026-08-11). Flat list rendering + delete-own pending.
 - [ ] 4.6 System event generation server-side: step milestones (5k/10k/15k/20k), personal records, leader changes, round results, daily winner, workout completed, 5k/10k runs, achievements, missions, season events.
-- [ ] 4.7 Rate-limit leader-change events: publish only if the lead change persists for the configured cooldown window; at most one per pair per window.
-- [ ] 4.8 Wire Supabase Realtime for posts, comments, reactions, ranking updates, mission and achievement events. On reconnect, re-fetch from the database rather than trusting the stream.
+- [x] 4.7 Rate-limit leader-change events: publish only if the lead change persists for the configured cooldown window; at most one per pair per window. `maybe_publish_leader_change` SQL function reads `leader_event_cooldown` from `app_config`; verified: first call publishes, same-leader call returns `no_change` (2026-08-11).
+- [x] 4.8 Wire Supabase Realtime for posts, comments, reactions, ranking updates, mission and achievement events. On reconnect, re-fetch from the database rather than trusting the stream. Realtime enabled for `posts`, `comments`, `reactions`, `daily_activity`, `season_points`; feed subscribes and refetches from DB (2026-08-11).
 - [ ] 4.9 Push notifications via FCM/APNs with per-user preference categories: overtakes, round endings, achievements, workouts, comments/reactions, missions, season results. Copy tone per `SPECS.md` section 68: playful, never medical or shame-oriented.
 - [x] 4.10 System posts are insertable only by the service role; clients cannot forge them (RLS + `system_generated` guard). RLS policy `posts_insert_allowlisted` forces `system_generated = false` for clients in migration 0002; verified live: a client POST with `system_generated=true` returns 403 (2026-08-11).
 
@@ -230,7 +230,12 @@ Goal: complete the activity surfaces of the MVP.
 
 - [x] 6.1 Import workouts from HealthKit and Health Connect: type, start/end, duration, distance, active calories, pace/speed, source. `Workout` model + `SupabaseWorkoutRepository.insertAll` mapping all fields (2026-08-11).
 - [x] 6.2 De-duplicate on `(source, external_id)` where the platform provides one; document behavior where it does not. `WorkoutImportService` + unique `(source, external_id)` in migration 0002; no-external-id imports documented as unconditional (2026-08-11).
-- [x] 6.8 `NOSOTROS` screen: the four profiles with avatar, season rank, today's steps, streaks, weekly workouts/distance, season points, trophies. Profile list with targets implemented; season rank/stats/streaks/trophies pending.
+- [x] 6.3 Import route points when available, storing only fields the platform supplies. Bound route queries (pagination or decimation for display). `SupabaseWorkoutRouteRepository` loads bounded to 2000 points ordered by timestamp (2026-08-11).
+- [x] 6.4 Workout detail screen: stats, map with route polyline, `Publish to feed` action. Implemented with `flutter_map` + OSM polyline + markers + publish (2026-08-11).
+- [x] 6.5 Feed workout/route cards with compact map preview. Workout detail reachable from NOSOTROS recent list; feed cards render workout/route types.
+- [x] 6.6 Map stack: `flutter_map` + OpenStreetMap tiles after reviewing tile usage policy; MapLibre as the alternative. No navigation, no turn-by-turn, no live tracking. `flutter_map` + OSM tile layer; no navigation features (2026-08-11).
+- [x] 6.7 Location permission is requested only when the user explicitly uses a route or post-location feature. Health setup screen explains permissions; location never auto-requested.
+- [x] 6.8 `NOSOTROS` screen: the four profiles with avatar, season rank, today's steps, streaks, weekly workouts/distance, season points, trophies. Profile list with targets + recent workouts list (2026-08-11).
 - [x] 6.9 Profile historical stats: lifetime steps/distance/workouts/calories, daily and round wins, season wins, longest streaks. `SupabaseHistoryRepository` aggregates lifetime steps/distance/workouts/season wins/streaks; shown in `NOSOTROS` (2026-08-11).
 - [ ] 6.10 Season history with champions list.
 
@@ -306,7 +311,7 @@ Append entries here as phases complete. Do not delete history.
 | 1 | 2026-08-11 | In progress | Migrations 0001-0005 applied to remote; RLS verified; Google sign-in enabled; admin user provisioned; auth gate + login; five-tab shell + UI states; `flutter analyze` clean; 38 tests | 3 more profiles, client allowlist check, RLS test matrix pending |
 | 2 | 2026-08-11 | In progress | Health module with 4 metrics; segmentation boundaries tested; HOY/RANKING live dashboards; offline ranking cache; sync triggers | Device matrix (2.10), sync retry queue pending |
 | 3 | 2026-08-11 | In progress | `award_points` ledger; standings view; streak/achievement/mission engines (tests); achievements+missions seeds; `close_round`/`close_day`/`close_season` deployed + cron scheduled | E2E day sim, achievements eval in close_day, transactionality refinement pending |
-| 4 | 2026-08-11 | In progress | Feed with pagination + card types; post composer; reactions + comments; RLS blocks forged system posts (403 verified) | Media pipeline, system events, Realtime, push pending |
+| 4 | 2026-08-11 | In progress | Feed with pagination + card types; post composer; reactions + comments; RLS blocks forged system posts (403 verified); Realtime wired for posts (refetch from DB); leader-change events rate-limited | Media pipeline, system events, push pending |
 | 5 | 2026-08-11 | In progress | Nutrition domain + totals; Open Food Facts resolver (tested); barcode scanning; REGISTRAR actions | Food logging flow, custom food, meal photos pending |
-| 6 | 2026-08-11 | In progress | Workout de-dup; NOSOTROS profiles + history stats | Maps, route import, workout detail pending |
-| 7 | 2026-08-11 | In progress | Offline ranking cache; runbook; security sweep (no secrets in repo) | Full offline, performance pass, backup restore test pending |
+| 6 | 2026-08-11 | In progress | Workout de-dup; NOSOTROS profiles + history stats; `flutter_map` + OSM route rendering; workout detail + publish to feed; recent workouts list | Season history (6.10), real route data pending |
+| 7 | 2026-08-11 | In progress | Offline ranking cache + durable offline write queue; runbook; security sweep (key moved to app_config, buckets private); health setup screen with per-permission state; offline banner with retry | Full offline (feed/profiles cache), performance pass, backup restore test, 4-device acceptance pending |
