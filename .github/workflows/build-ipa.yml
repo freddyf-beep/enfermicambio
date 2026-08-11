@@ -39,10 +39,15 @@ jobs:
         shell: pwsh
 
       - name: Build iOS app (device, unsigned)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           # --no-codesign produces an unsigned .app; the device slice is then
           # packaged and sideloaded with a free Apple ID.
-          flutter build ios --release --no-codesign
+          flutter build ios --release --no-codesign \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 
       - name: Package unsigned IPA
         run: |
