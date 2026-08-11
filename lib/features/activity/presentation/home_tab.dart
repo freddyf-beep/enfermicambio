@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app/data/dashboard_cache.dart';
-import '../../feed/data/supabase_post_repository.dart';
+import '../../app/data/offline_post_service.dart';
 import '../../feed/domain/feed_models.dart';
 import '../../feed/presentation/feed_list.dart';
 import '../../health/domain/health_models.dart';
@@ -21,7 +21,7 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   late final DashboardRepository _repository;
-  late final SupabasePostRepository _posts;
+  late final OfflinePostService _posts;
   AppDashboardData? _data;
   AsyncViewStatus? _status;
   DashboardCache? _cache;
@@ -31,7 +31,7 @@ class _HomeTabState extends State<HomeTab> {
   void initState() {
     super.initState();
     _repository = DashboardRepository(client: Supabase.instance.client);
-    _posts = SupabasePostRepository(client: Supabase.instance.client);
+    _posts = OfflinePostService(client: Supabase.instance.client);
     _init();
   }
 
@@ -50,6 +50,8 @@ class _HomeTabState extends State<HomeTab> {
       });
     }
     await _load();
+    // Replay any writes that were queued while offline.
+    await _posts.flushPending();
   }
 
   Future<void> _load() async {
