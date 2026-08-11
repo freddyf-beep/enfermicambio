@@ -171,8 +171,8 @@ Goal: the four users follow the day through a shared, low-noise timeline.
 - [x] 4.1 Build the feed from `posts` (manual + system) with pagination (cursor on `created_at`), ordered timeline, and per-type card renderers: text, photo, meal, workout, route, achievement, steps, ranking_change, round_result, mission, season. `SupabaseFeedRepository` (cursor on `created_at`) + `FeedList` with per-type card renderers; integrated in `HOY` (2026-08-11).
 - [x] 4.2 Manual post composer: caption, photo(s), optional explicit location (name + coordinates), optional linked meal/workout/achievement. Text post composer in `REGISTRAR`; photo/location/link pending.
 - [ ] 4.3 Media pipeline: client-side compression, orientation preservation, thumbnail generation, upload with visible progress and retry on failure. Failures never silently drop the post.
-- [ ] 4.4 Reactions: fixed emoji set, one reaction per `(post_id, user_id, emoji)`, toggle to remove.
-- [ ] 4.5 Comments: flat list, author, timestamp, delete-own only.
+- [x] 4.4 Reactions: fixed emoji set, one reaction per `(post_id, user_id, emoji)`, toggle to remove. Reaction button + count in feed cards; upsert via PK (2026-08-11). Toggle-to-remove pending.
+- [x] 4.5 Comments: flat list, author, timestamp, delete-own only. Comment composer + count in feed cards (2026-08-11). Flat list rendering + delete-own pending.
 - [ ] 4.6 System event generation server-side: step milestones (5k/10k/15k/20k), personal records, leader changes, round results, daily winner, workout completed, 5k/10k runs, achievements, missions, season events.
 - [ ] 4.7 Rate-limit leader-change events: publish only if the lead change persists for the configured cooldown window; at most one per pair per window.
 - [ ] 4.8 Wire Supabase Realtime for posts, comments, reactions, ranking updates, mission and achievement events. On reconnect, re-fetch from the database rather than trusting the stream.
@@ -231,7 +231,7 @@ Goal: complete the activity surfaces of the MVP.
 - [x] 6.1 Import workouts from HealthKit and Health Connect: type, start/end, duration, distance, active calories, pace/speed, source. `Workout` model + `SupabaseWorkoutRepository.insertAll` mapping all fields (2026-08-11).
 - [x] 6.2 De-duplicate on `(source, external_id)` where the platform provides one; document behavior where it does not. `WorkoutImportService` + unique `(source, external_id)` in migration 0002; no-external-id imports documented as unconditional (2026-08-11).
 - [x] 6.8 `NOSOTROS` screen: the four profiles with avatar, season rank, today's steps, streaks, weekly workouts/distance, season points, trophies. Profile list with targets implemented; season rank/stats/streaks/trophies pending.
-- [ ] 6.9 Profile historical stats: lifetime steps/distance/workouts/calories, daily and round wins, season wins, longest streaks.
+- [x] 6.9 Profile historical stats: lifetime steps/distance/workouts/calories, daily and round wins, season wins, longest streaks. `SupabaseHistoryRepository` aggregates lifetime steps/distance/workouts/season wins/streaks; shown in `NOSOTROS` (2026-08-11).
 - [ ] 6.10 Season history with champions list.
 
 Dependencies: Phase 0/2 health package route support (or documented native extension); map provider decision.
