@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -26,6 +28,7 @@ class _HomeTabState extends State<HomeTab> {
   AsyncViewStatus? _status;
   DashboardCache? _cache;
   bool _showingCache = false;
+  RealtimeChannel? _realtimeChannel;
 
   @override
   void initState() {
@@ -33,6 +36,15 @@ class _HomeTabState extends State<HomeTab> {
     _repository = DashboardRepository(client: Supabase.instance.client);
     _posts = OfflinePostService(client: Supabase.instance.client);
     _init();
+  }
+
+  @override
+  void dispose() {
+    final channel = _realtimeChannel;
+    if (channel != null) {
+      Supabase.instance.client.removeChannel(channel);
+    }
+    super.dispose();
   }
 
   Future<void> _init() async {
@@ -52,6 +64,23 @@ class _HomeTabState extends State<HomeTab> {
     await _load();
     // Replay any writes that were queued while offline.
     await _posts.flushPending();
+    _subscribeRealtime();
+  }
+
+  void _subscribeRealtime() {
+    _realtimeChannel = Supabase.instance.client
+        .channel('feed')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'posts',
+          callback: (_) {
+            if (mounted) {
+              _load();
+            }
+          },
+        )
+        .subscribe();
   }
 
   Future<void> _load() async {
