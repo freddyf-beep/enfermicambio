@@ -7,17 +7,40 @@ import '../../profiles/presentation/about_tab.dart';
 import '../../ranking/presentation/ranking_tab.dart';
 
 class AppShell extends StatefulWidget {
-  const AppShell({super.key, this.tabs});
+  const AppShell({super.key, this.tabs, this.onResume});
 
   /// The five product tabs. Overridable for tests and dependency injection.
   final List<Widget>? tabs;
+
+  /// Called when the app returns to the foreground (resume). Used to trigger
+  /// health sync without blocking the shell.
+  final VoidCallback? onResume;
 
   @override
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      widget.onResume?.call();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

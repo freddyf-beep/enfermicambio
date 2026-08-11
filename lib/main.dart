@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/data/latest.dart' as timezone_data;
 
+import 'features/app/data/health_sync_bootstrap.dart';
 import 'features/app/presentation/app_shell.dart';
 import 'features/auth/presentation/auth_gate.dart';
 
@@ -34,7 +35,9 @@ class EnfermicambioApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const AuthGate(child: AppShell()),
+      home: const AuthGate(
+        child: AppShell(onResume: HealthSyncBootstrap.syncOnResume),
+      ),
     );
   }
 }
