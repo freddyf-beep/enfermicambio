@@ -159,10 +159,34 @@ class _HomeTabState extends State<HomeTab> {
           padding: const EdgeInsets.all(16),
           children: [
             if (_showingCache) ...[
-              Text(
-                'Showing cached data',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.outline,
+              Row(
+                children: [
+                  const Icon(Icons.cloud_off_outlined, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Showing cached data',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                  ),
+                  TextButton(onPressed: _load, child: const Text('Retry')),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
+            if (_status?.state == AsyncState.offline) ...[
+              Card(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                child: ListTile(
+                  leading: const Icon(Icons.wifi_off),
+                  title: const Text('You are offline'),
+                  subtitle: Text(_status!.message ?? ''),
+                  trailing: TextButton(
+                    onPressed: _load,
+                    child: const Text('Retry'),
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
