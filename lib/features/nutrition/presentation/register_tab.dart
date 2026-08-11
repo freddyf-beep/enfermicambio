@@ -4,6 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../feed/data/supabase_post_repository.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
+import '../data/open_food_facts_repository.dart';
+import 'barcode_scan_screen.dart';
 
 class RegisterTab extends StatefulWidget {
   const RegisterTab({super.key});
@@ -14,6 +16,7 @@ class RegisterTab extends StatefulWidget {
 
 class _RegisterTabState extends State<RegisterTab> {
   late final SupabasePostRepository _posts;
+  final _foodResolver = OpenFoodFactsRepository();
 
   @override
   void initState() {
@@ -67,6 +70,54 @@ class _RegisterTabState extends State<RegisterTab> {
     }
   }
 
+  Future<void> _scanBarcode() async {
+    final barcode = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (context) => BarcodeScanScreen(onResult: (value) {}),
+      ),
+    );
+    if (barcode == null) return;
+    await _resolveBarcode(barcode);
+  }
+
+  Future<void> _resolveBarcode(String barcode) async {
+    try {
+      final food = await _foodResolver.resolveByBarcode(barcode);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(food.name),
+          content: Text(
+            '${food.calories.round()} kcal per ${food.servingSize} '
+            '${food.servingUnit}. Logging from a scan is next in Phase 5.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } on FoodLookupFailure catch (failure) {
+      if (!mounted) return;
+      final message = switch (failure) {
+        FoodLookupFailure.notFound =>
+          'No product found for this barcode. You can create a custom food.',
+        FoodLookupFailure.timeout =>
+          'The food service timed out. Check your connection and try again.',
+        FoodLookupFailure.malformed =>
+          'The food service returned an unexpected response.',
+        FoodLookupFailure.network =>
+          'Could not reach the food service. Try again later.',
+      };
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,13 +129,7 @@ class _RegisterTabState extends State<RegisterTab> {
             icon: Icons.qr_code_scanner,
             title: 'Scan a barcode',
             subtitle: 'Resolve a food product to log.',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Barcode scanning is coming in Phase 5.'),
-                ),
-              );
-            },
+            onTap: _scanBarcode,
           ),
           _ActionCard(
             icon: Icons.camera_alt_outlined,
