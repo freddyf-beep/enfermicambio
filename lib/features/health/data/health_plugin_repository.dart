@@ -81,6 +81,47 @@ class HealthPluginRepository implements HealthRepository {
     }
   }
 
+  @override
+  Future<HealthSetupSnapshot> readSetupStatus() async {
+    await _configure();
+    final platform = _platformName;
+    try {
+      final granted = <HealthMetricType>{};
+      for (final type in _readTypes) {
+        final has = await _health.hasPermissions([type]);
+        if (has == true) {
+          granted.add(_mapType(type));
+        }
+      }
+      return HealthSetupSnapshot(
+        platform: platform,
+        healthAvailable: true,
+        grantedTypes: granted,
+        message: null,
+      );
+    } on Exception catch (error) {
+      return HealthSetupSnapshot(
+        platform: platform,
+        healthAvailable: false,
+        grantedTypes: const {},
+        message: error.toString(),
+      );
+    }
+  }
+
+  @override
+  Future<bool> requestAllPermissions() async {
+    await _configure();
+    try {
+      return await _health.requestAuthorization(
+        _readTypes,
+        permissions: const [HealthDataAccess.READ],
+      );
+    } on Exception {
+      return false;
+    }
+  }
+
   Future<void> _configure() async {
     if (_configured) {
       return;

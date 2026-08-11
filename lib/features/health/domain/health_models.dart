@@ -123,6 +123,29 @@ abstract interface class HealthRepository {
     required DateTime now,
     required String competitionTimezone,
   });
+
+  /// Platform identity and whether the underlying health service is usable.
+  /// [message] explains why a connection may fail (missing Health Connect app,
+  /// simulator, unsupported platform, etc.).
+  Future<HealthSetupSnapshot> readSetupStatus();
+
+  /// Requests all read permissions the app supports in one flow.
+  Future<bool> requestAllPermissions();
+}
+
+/// Platform-level health availability and permission state.
+class HealthSetupSnapshot {
+  const HealthSetupSnapshot({
+    required this.platform,
+    required this.healthAvailable,
+    required this.grantedTypes,
+    required this.message,
+  });
+
+  final String platform;
+  final bool healthAvailable;
+  final Set<HealthMetricType> grantedTypes;
+  final String? message;
 }
 
 abstract interface class DailyActivitySink {

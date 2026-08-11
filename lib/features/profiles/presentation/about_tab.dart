@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
+import '../../health/data/health_plugin_repository.dart';
+import '../../health/presentation/health_setup_screen.dart';
 import '../data/supabase_history_repository.dart';
 import '../data/supabase_profile_repository.dart';
 import '../domain/profile_history_stats.dart';
@@ -67,7 +69,23 @@ class _AboutTabState extends State<AboutTab> {
       );
     }
     return Scaffold(
-      appBar: AppBar(title: const Text('NOSOTROS')),
+      appBar: AppBar(
+        title: const Text('NOSOTROS'),
+        actions: [
+          IconButton(
+            tooltip: 'Health settings',
+            icon: const Icon(Icons.health_and_safety_outlined),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      HealthSetupScreen(repository: HealthPluginRepository()),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView.builder(
