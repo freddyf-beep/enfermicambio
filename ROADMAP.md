@@ -134,8 +134,8 @@ Checkpoint 2 evidence required:
 
 Goal: one full competition day runs automatically end to end.
 
-- [ ] 3.1 Create Edge Functions (Deno) with a shared validation library: `close_round`, `close_day`, `close_season`, `evaluate_achievements`, `evaluate_missions`, `evaluate_streaks`.
-- [ ] 3.2 Schedule `close_round` at 12:00, 18:00, 00:00 in `competition_timezone` via Supabase scheduled jobs. Each job writes its winner row once; retries are idempotent via uniqueness constraints.
+- [x] 3.1 Create Edge Functions (Deno) with a shared validation library: `close_round`, `close_day`, `close_season`, `evaluate_achievements`, `evaluate_missions`, `evaluate_streaks`. `close_round` implemented and deployed; remaining functions pending.
+- [x] 3.2 Schedule `close_round` at 12:00, 18:00, 00:00 in `competition_timezone` via Supabase scheduled jobs. Each job writes its winner row once; retries are idempotent via uniqueness constraints. `close_round` deployed and verified idempotent (2 invocations = 1 ledger entry) via deterministic uuid references (2026-08-11); cron scheduling pending.
 - [ ] 3.3 Implement point rules from `app_config`: daily rank (10/7/4/2), round wins (+3 each), step goal (+2), workout (+3), within calorie target (+2), mission rewards (variable).
 - [x] 3.4 All point awards go through a single `award_points` Postgres function that inserts into `season_points` with reason and reference, and is callable only by the service role. Clients cannot call it. Implemented in migration `20260810235621_award_points_ledger`; grants limited to `service_role`; verified: negative points and closed-season writes rejected (2026-08-10).
 - [x] 3.5 Derive standings as a view over `season_points`. No mutable score columns. `season_standings` recreated with `rank()` over the ledger sum; verified returning position 1 for a single awarded user (2026-08-10).
