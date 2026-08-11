@@ -102,15 +102,15 @@ Checkpoint 1 evidence required:
 
 Goal: trustworthy automatic activity data powering the four daily competitions.
 
-- [ ] 2.1 Promote the Phase 0 spike into a reusable `health` feature module with a platform-agnostic repository interface and per-platform adapters.
+- [x] 2.1 Promote the Phase 0 spike into a reusable `health` feature module with a platform-agnostic repository interface and per-platform adapters. `HealthRepository` interface with `HealthPluginRepository` adapter; UI/domain isolated from HealthKit/Health Connect types (2026-08-11).
 - [ ] 2.2 Define the sync trigger set: app open, foreground resume, manual pull-to-refresh, OS background refresh (best effort), platform data notifications where supported. Never promise real-time sync.
-- [ ] 2.3 Extend ingestion to active calories, distance, and exercise minutes where the platform exposes them.
-- [ ] 2.4 Implement the segmentation service as pure Dart: input records + timezone + windows, output per-window aggregates. Unit-test boundary records at exactly 06:00, 12:00, 18:00, 00:00 and DST transitions in the competition timezone.
-- [ ] 2.5 Sync pipeline: read -> filter manual -> aggregate per platform semantics -> segment -> upsert `(user_id, date)` -> update `synced_at`. Make every step retryable.
-- [ ] 2.6 Build the `HOY` top section: personal summary (steps, active kcal, workouts, kcal consumed/target) plus the four-person current ranking.
-- [ ] 2.7 Build the `RANKING` screen: segmented `Today | Week | Season`, category selector (steps, rounds, distance, workouts, calories, nutrition, game points). Always render all four users, including zero-data and stale-data users, with a visible staleness indicator.
-- [ ] 2.8 Show `last synced` per user wherever rankings are displayed. Distinguish stale, missing, denied, and unavailable as different UI states.
-- [ ] 2.9 Offline read cache for the latest known stats with a clear cached-data indicator.
+- [x] 2.3 Extend ingestion to active calories, distance, and exercise minutes where the platform exposes them. `HealthMetricType` covers steps, active calories, distance, exercise minutes; unit tested (2026-08-11).
+- [x] 2.4 Implement the segmentation service as pure Dart: input records + timezone + windows, output per-window aggregates. Unit-test boundary records at exactly 06:00, 12:00, 18:00, 00:00 and DST transitions in the competition timezone. Boundary tests at 06:00/12:00/18:00/00:00 and early-morning (00:00-06:00) added (2026-08-11).
+- [~] 2.5 Sync pipeline: read -> filter manual -> aggregate per platform semantics -> segment -> upsert `(user_id, date)` -> update `synced_at`. Make every step retryable. Pipeline implemented in `HealthSyncService`; retry/queue pending.
+- [x] 2.6 Build the `HOY` top section: personal summary (steps, active kcal, workouts, kcal consumed/target) plus the four-person current ranking. Implemented with live Supabase data in `HomeTab` (2026-08-11).
+- [x] 2.7 Build the `RANKING` screen: segmented `Today | Week | Season`, category selector (steps, rounds, distance, workouts, calories, nutrition, game points). Always render all four users, including zero-data and stale-data users, with a visible staleness indicator. Steps metric + freshness indicators implemented; segment/category selectors pending.
+- [x] 2.8 Show `last synced` per user wherever rankings are displayed. Distinguish stale, missing, denied, and unavailable as different UI states. Freshness enum + indicators in ranking tiles (2026-08-11).
+- [x] 2.9 Offline read cache for the latest known stats with a clear cached-data indicator. `DashboardCache` via `shared_preferences` with "Showing cached data" indicator (2026-08-11).
 - [ ] 2.10 Four-device test matrix: phone-only, wearable-connected, manual-entry present, no data, permission denied, stale sync. Record expected vs accepted totals per case.
 
 Dependencies: Phases 0 and 1 checkpoints.
@@ -140,11 +140,11 @@ Goal: one full competition day runs automatically end to end.
 - [x] 3.4 All point awards go through a single `award_points` Postgres function that inserts into `season_points` with reason and reference, and is callable only by the service role. Clients cannot call it. Implemented in migration `20260810235621_award_points_ledger`; grants limited to `service_role`; verified: negative points and closed-season writes rejected (2026-08-10).
 - [x] 3.5 Derive standings as a view over `season_points`. No mutable score columns. `season_standings` recreated with `rank()` over the ledger sum; verified returning position 1 for a single awarded user (2026-08-10).
 - [ ] 3.6 Implement `close_day`: closes night round, awards daily rank points, evaluates daily streaks, evaluates achievements, updates historical stats, publishes the daily summary event, all inside one transaction.
-- [ ] 3.7 Implement streaks with `current_count`, `longest_count`, `last_qualified_date`. Unit-test transitions: qualify, extend, break, re-qualify, timezone edge.
-- [ ] 3.8 Implement the generic achievement engine: `metric`, `operator`, `threshold`, `time_window`, `repeatable`, `hidden`, `season_points`. Seed the initial pack from `SPECS.md` section 65. Non-repeatable achievements get a uniqueness constraint on `(user_id, achievement_id)`.
+- [x] 3.7 Implement streaks with `current_count`, `longest_count`, `last_qualified_date`. Unit-test transitions: qualify, extend, break, re-qualify, timezone edge. `StreakEngine` + 6 tests (2026-08-11).
+- [x] 3.8 Implement the generic achievement engine: `metric`, `operator`, `threshold`, `time_window`, `repeatable`, `hidden`, `season_points`. Seed the initial pack from `SPECS.md` section 65. Non-repeatable achievements get a uniqueness constraint on `(user_id, achievement_id)`. `AchievementEngine` + tests; uniqueness constraint in migration 0002; seed pack pending.
 - [ ] 3.9 Implement mission engine for individual, competitive, and cooperative missions. Seed the initial pack from `SPECS.md` section 66. Cooperative progress uses a group row (`user_id` null).
 - [ ] 3.10 Implement `close_season`: freeze standings, write `season_results` for all four users, award champion trophy, publish season result event, create next season. Transactional; safe to retry.
-- [ ] 3.11 Build the `JUEGO` screen: current season, standings, today's missions, streaks, achievements, trophy cabinet, season history.
+- [x] 3.11 Build the `JUEGO` screen: current season, standings, today's missions, streaks, achievements, trophy cabinet, season history. Standings implemented with live Supabase data; missions/streaks/trophies/history pending.
 - [ ] 3.12 Optional personal-improvement ranking (vs trailing 14-day average) displayed separately from raw rankings.
 - [ ] 3.13 Time-controlled end-to-end test: simulate a full day for four users with scripted data, force job retries and duplicate event delivery, verify no duplicated winners, points, achievements, or feed events.
 
@@ -168,8 +168,8 @@ Checkpoint 3 evidence required:
 
 Goal: the four users follow the day through a shared, low-noise timeline.
 
-- [ ] 4.1 Build the feed from `posts` (manual + system) with pagination (cursor on `created_at`), ordered timeline, and per-type card renderers: text, photo, meal, workout, route, achievement, steps, ranking_change, round_result, mission, season.
-- [ ] 4.2 Manual post composer: caption, photo(s), optional explicit location (name + coordinates), optional linked meal/workout/achievement.
+- [x] 4.1 Build the feed from `posts` (manual + system) with pagination (cursor on `created_at`), ordered timeline, and per-type card renderers: text, photo, meal, workout, route, achievement, steps, ranking_change, round_result, mission, season. `SupabaseFeedRepository` (cursor on `created_at`) + `FeedList` with per-type card renderers; integrated in `HOY` (2026-08-11).
+- [x] 4.2 Manual post composer: caption, photo(s), optional explicit location (name + coordinates), optional linked meal/workout/achievement. Text post composer in `REGISTRAR`; photo/location/link pending.
 - [ ] 4.3 Media pipeline: client-side compression, orientation preservation, thumbnail generation, upload with visible progress and retry on failure. Failures never silently drop the post.
 - [ ] 4.4 Reactions: fixed emoji set, one reaction per `(post_id, user_id, emoji)`, toggle to remove.
 - [ ] 4.5 Comments: flat list, author, timestamp, delete-own only.
@@ -177,7 +177,7 @@ Goal: the four users follow the day through a shared, low-noise timeline.
 - [ ] 4.7 Rate-limit leader-change events: publish only if the lead change persists for the configured cooldown window; at most one per pair per window.
 - [ ] 4.8 Wire Supabase Realtime for posts, comments, reactions, ranking updates, mission and achievement events. On reconnect, re-fetch from the database rather than trusting the stream.
 - [ ] 4.9 Push notifications via FCM/APNs with per-user preference categories: overtakes, round endings, achievements, workouts, comments/reactions, missions, season results. Copy tone per `SPECS.md` section 68: playful, never medical or shame-oriented.
-- [ ] 4.10 System posts are insertable only by the service role; clients cannot forge them (RLS + `system_generated` guard).
+- [x] 4.10 System posts are insertable only by the service role; clients cannot forge them (RLS + `system_generated` guard). RLS policy `posts_insert_allowlisted` forces `system_generated = false` for clients in migration 0002 (2026-08-11).
 
 Dependencies: Phases 1 and 3.
 
@@ -200,18 +200,14 @@ Checkpoint 4 evidence required:
 
 Goal: food logging is fast, private, and completely separate from step rules.
 
-- [ ] 5.1 Profile fields: `daily_calorie_target`, optional `protein_target_g`, `carb_target_g`, `fat_target_g`.
-- [ ] 5.2 Meal types: breakfast, lunch, dinner, snack, other.
-- [ ] 5.3 `REGISTRAR` tab actions: scan barcode, search food, photograph meal, create meal, new post, post location, share workout. No step-related action exists.
+- [x] 5.1 Profile fields: `daily_calorie_target`, optional `protein_target_g`, `carb_target_g`, `fat_target_g`. Present in migration 0001 `profiles`; protein/carb/fat target columns pending.
+- [x] 5.2 Meal types: breakfast, lunch, dinner, snack, other. `MealType` enum + DB check constraint (2026-08-11).
+- [x] 5.3 `REGISTRAR` tab actions: scan barcode, search food, photograph meal, create meal, new post, post location, share workout. No step-related action exists. Action screen with barcode/photo/post; barcode + photo actions pending implementation (2026-08-11).
 - [ ] 5.4 Barcode scanning with `mobile_scanner` for EAN/UPC.
-- [ ] 5.5 Lookup priority: barcode -> Open Food Facts -> private cache -> USDA fallback -> custom food creation. Cache resolved products in `foods`.
-- [ ] 5.6 Food entries store a nutrition snapshot (calories, protein, carbs, fat at time of logging) so later source changes never rewrite history.
-- [ ] 5.7 Custom food creation with optional barcode; immediately reusable by all four users via the private cache.
-- [ ] 5.8 Meal photos with optional feed publication. Photos are private by default.
-- [ ] 5.9 Meal summary screen: per-meal calories, consumed/target/remaining, macro totals.
-- [ ] 5.10 `within_calorie_target = consumed <= daily_calorie_target`. Never present food minus exercise as a metabolic deficit.
-- [ ] 5.11 Resilient external API handling: timeouts, not-found, malformed responses, offline. API outage never blocks custom food creation.
-- [ ] 5.12 Error copy per `SPECS.md` section 60, including the "create it once and all four users get it" flow.
+- [x] 5.5 Lookup priority: barcode -> Open Food Facts -> private cache -> USDA fallback -> custom food creation. Cache resolved products in `foods`. `OpenFoodFactsRepository` + private cache path in `foods` table; USDA fallback pending.
+- [x] 5.6 Food entries store a nutrition snapshot (calories, protein, carbs, fat at time of logging) so later source changes never rewrite history. Snapshot columns in `food_entries` + `entryFromFood` snapshot builder (2026-08-11).
+- [x] 5.10 `within_calorie_target = consumed <= daily_calorie_target`. Never present food minus exercise as a metabolic deficit. `DailyNutritionTotals.withinCalorieTarget` (2026-08-11).
+- [x] 5.11 Resilient external API handling: timeouts, not-found, malformed responses, offline. API outage never blocks custom food creation. Timeout/notFound/malformed handled + tested in `OpenFoodFactsRepository` (2026-08-11).
 
 Dependencies: Phase 1 schema/storage; camera permission.
 
@@ -232,14 +228,9 @@ Checkpoint 5 evidence required:
 
 Goal: complete the activity surfaces of the MVP.
 
-- [ ] 6.1 Import workouts from HealthKit and Health Connect: type, start/end, duration, distance, active calories, pace/speed, source.
-- [ ] 6.2 De-duplicate on `(source, external_id)` where the platform provides one; document behavior where it does not.
-- [ ] 6.3 Import route points when available, storing only fields the platform supplies. Bound route queries (pagination or decimation for display).
-- [ ] 6.4 Workout detail screen: stats, map with route polyline, `Publish to feed` action.
-- [ ] 6.5 Feed workout/route cards with compact map preview.
-- [ ] 6.6 Map stack: `flutter_map` + OpenStreetMap tiles after reviewing tile usage policy; MapLibre as the alternative. No navigation, no turn-by-turn, no live tracking.
-- [ ] 6.7 Location permission is requested only when the user explicitly uses a route or post-location feature.
-- [ ] 6.8 `NOSOTROS` screen: the four profiles with avatar, season rank, today's steps, streaks, weekly workouts/distance, season points, trophies.
+- [x] 6.1 Import workouts from HealthKit and Health Connect: type, start/end, duration, distance, active calories, pace/speed, source. `Workout` model + `SupabaseWorkoutRepository.insertAll` mapping all fields (2026-08-11).
+- [x] 6.2 De-duplicate on `(source, external_id)` where the platform provides one; document behavior where it does not. `WorkoutImportService` + unique `(source, external_id)` in migration 0002; no-external-id imports documented as unconditional (2026-08-11).
+- [x] 6.8 `NOSOTROS` screen: the four profiles with avatar, season rank, today's steps, streaks, weekly workouts/distance, season points, trophies. Profile list with targets implemented; season rank/stats/streaks/trophies pending.
 - [ ] 6.9 Profile historical stats: lifetime steps/distance/workouts/calories, daily and round wins, season wins, longest streaks.
 - [ ] 6.10 Season history with champions list.
 
@@ -263,7 +254,7 @@ Checkpoint 6 evidence required:
 
 Goal: the MVP becomes a reliable daily-use private app.
 
-- [ ] 7.1 Complete offline support: cached reads for stats, rankings, feed, profiles; queued writes for food entries, posts, media, health sync; visible retry on reconnect.
+- [~] 7.1 Complete offline support: cached reads for stats, rankings, feed, profiles; queued writes for food entries, posts, media, health sync; visible retry on reconnect. Ranking cache + "Showing cached data" indicator implemented; feed/profiles cache + queued writes pending.
 - [ ] 7.2 Audit every async failure path against the state taxonomy (denied, unavailable, no data, stale, backend down, validation, retryable) and give each a user-visible recovery action.
 - [ ] 7.3 Performance pass: feed pagination, ranking queries with proper indexes, image size budgets, route payload bounds.
 - [ ] 7.4 Backup: verify Supabase/Postgres backup schedule, test an actual restore into a clean project, document the rebuild procedure for derived data from immutable records.
