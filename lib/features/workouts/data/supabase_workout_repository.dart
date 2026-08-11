@@ -7,15 +7,64 @@ class SupabaseWorkoutRepository {
 
   final SupabaseClient _client;
 
-  Future<List<String>> existingExternalIds({required String userId}) async {
+  Future<Workout?> findById(String workoutId) async {
     final rows = await _client
         .from('workouts')
-        .select('external_id')
-        .eq('user_id', userId)
-        .not('external_id', 'is', null);
+        .select(
+          'id, user_id, workout_type, started_at, ended_at, duration_seconds, '
+          'source, external_id, distance_meters, active_calories, avg_pace, '
+          'avg_speed, route_available',
+        )
+        .eq('id', workoutId)
+        .limit(1);
+    if (rows.isEmpty) return null;
+    final row = rows.first;
+    return Workout(
+      id: row['id'] as String,
+      userId: row['user_id'] as String,
+      workoutType: row['workout_type'] as String,
+      startedAt: DateTime.parse(row['started_at'] as String),
+      endedAt: DateTime.parse(row['ended_at'] as String),
+      durationSeconds: (row['duration_seconds'] as num).toInt(),
+      source: row['source'] as String,
+      externalId: row['external_id'] as String?,
+      distanceMeters: (row['distance_meters'] as num?)?.toDouble(),
+      activeCalories: (row['active_calories'] as num?)?.toDouble(),
+      avgPace: (row['avg_pace'] as num?)?.toDouble(),
+      avgSpeed: (row['avg_speed'] as num?)?.toDouble(),
+      routeAvailable: (row['route_available'] as bool?) ?? false,
+    );
+  }
+
+  Future<List<Workout>> listRecent({required int limit}) async {
+    final rows = await _client
+        .from('workouts')
+        .select(
+          'id, user_id, workout_type, started_at, ended_at, duration_seconds, '
+          'source, external_id, distance_meters, active_calories, avg_pace, '
+          'avg_speed, route_available',
+        )
+        .order('started_at', ascending: false)
+        .limit(limit);
     return rows
         .cast<Map<String, dynamic>>()
-        .map((row) => row['external_id'] as String)
+        .map((row) {
+          return Workout(
+            id: row['id'] as String,
+            userId: row['user_id'] as String,
+            workoutType: row['workout_type'] as String,
+            startedAt: DateTime.parse(row['started_at'] as String),
+            endedAt: DateTime.parse(row['ended_at'] as String),
+            durationSeconds: (row['duration_seconds'] as num).toInt(),
+            source: row['source'] as String,
+            externalId: row['external_id'] as String?,
+            distanceMeters: (row['distance_meters'] as num?)?.toDouble(),
+            activeCalories: (row['active_calories'] as num?)?.toDouble(),
+            avgPace: (row['avg_pace'] as num?)?.toDouble(),
+            avgSpeed: (row['avg_speed'] as num?)?.toDouble(),
+            routeAvailable: (row['route_available'] as bool?) ?? false,
+          );
+        })
         .toList(growable: false);
   }
 

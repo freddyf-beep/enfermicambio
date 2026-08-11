@@ -5,6 +5,9 @@ import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
 import '../../health/data/health_plugin_repository.dart';
 import '../../health/presentation/health_setup_screen.dart';
+import '../../workouts/data/supabase_workout_repository.dart';
+import '../../workouts/domain/workout_models.dart';
+import '../../workouts/presentation/workout_detail_screen.dart';
 import '../data/supabase_history_repository.dart';
 import '../data/supabase_profile_repository.dart';
 import '../domain/profile_history_stats.dart';
@@ -20,8 +23,10 @@ class AboutTab extends StatefulWidget {
 class _AboutTabState extends State<AboutTab> {
   late final SupabaseProfileRepository _repository;
   late final SupabaseHistoryRepository _history;
+  late final SupabaseWorkoutRepository _workouts;
   List<UserProfile>? _profiles;
   final Map<String, ProfileHistoryStats> _stats = {};
+  List<Workout>? _recentWorkouts;
   AsyncViewStatus? _status;
 
   @override
@@ -29,6 +34,7 @@ class _AboutTabState extends State<AboutTab> {
     super.initState();
     _repository = SupabaseProfileRepository(client: Supabase.instance.client);
     _history = SupabaseHistoryRepository(client: Supabase.instance.client);
+    _workouts = SupabaseWorkoutRepository(client: Supabase.instance.client);
     _load();
   }
 
@@ -42,9 +48,11 @@ class _AboutTabState extends State<AboutTab> {
         final stats = await _history.statsFor(userId: profile.id);
         _stats[profile.id] = stats;
       }
+      final workouts = await _workouts.listRecent(limit: 20);
       if (!mounted) return;
       setState(() {
         _profiles = profiles;
+        _recentWorkouts = workouts;
       });
     } on Exception catch (error) {
       if (!mounted) return;
@@ -88,16 +96,60 @@ class _AboutTabState extends State<AboutTab> {
       ),
       body: RefreshIndicator(
         onRefresh: _load,
-        child: ListView.builder(
+        child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          itemCount: _profiles!.length,
-          itemBuilder: (context, index) {
-            final profile = _profiles![index];
-            return _ProfileTile(profile: profile, stats: _stats[profile.id]);
-          },
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: [
+            for (final profile in _profiles!)
+              _ProfileTile(profile: profile, stats: _stats[profile.id]),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Recent workouts',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            const SizedBox(height: 4),
+            if (_recentWorkouts == null || _recentWorkouts!.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text('No workouts synced yet.'),
+              )
+            else
+              for (final workout in _recentWorkouts!)
+                ListTile(
+                  leading: const Icon(Icons.directions_run),
+                  title: Text(_workoutType(workout.workoutType)),
+                  subtitle: Text(
+                    '${workout.startedAt.day}/${workout.startedAt.month} '
+                    '${workout.startedAt.hour}:'
+                    '${workout.startedAt.minute.toString().padLeft(2, '0')} - '
+                    '${((workout.distanceMeters ?? 0) / 1000).toStringAsFixed(1)} km',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            WorkoutDetailScreen(workoutId: workout.id),
+                      ),
+                    );
+                  },
+                ),
+          ],
         ),
       ),
     );
+  }
+
+  String _workoutType(String type) {
+    return switch (type) {
+      'running' => 'Run',
+      'walking' => 'Walk',
+      'cycling' => 'Ride',
+      _ => type.isEmpty ? 'Workout' : type[0].toUpperCase() + type.substring(1),
+    };
   }
 }
 
