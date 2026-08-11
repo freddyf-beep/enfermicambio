@@ -302,11 +302,10 @@ Append entries here as phases complete. Do not delete history.
 | Checkpoint | Date | Result | Evidence | Known limitations |
 | --- | --- | --- | --- | --- |
 | 0 | 2026-08-10 | In progress | `flutter analyze` clean; `flutter test` 2 passed; debug APK built; `docs/checkpoint-0.md` | Device validation (0.5/0.7/0.11), Xcode, Supabase CLI pending |
-| 1 | - | pending | - | - |
-| 1 (schema) | 2026-08-10 | In progress | Migration `20260810231207` applied; RLS/anon 401 verified; 4 private buckets created | Auth users, seed, app shell, client allowlist, app_config timezone pending |
-| 2 | - | pending | - | - |
-| 3 | - | pending | - | - |
-| 4 | - | pending | - | - |
-| 5 | - | pending | - | - |
-| 6 | - | pending | - | - |
-| 7 | - | pending | - | - |
+| 1 | 2026-08-11 | In progress | Migrations 0001-0005 applied to remote; RLS verified; Google sign-in enabled; admin user provisioned; auth gate + login; five-tab shell + UI states; `flutter analyze` clean; 38 tests | 3 more profiles, client allowlist check, RLS test matrix pending |
+| 2 | 2026-08-11 | In progress | Health module with 4 metrics; segmentation boundaries tested; HOY/RANKING live dashboards; offline ranking cache; sync triggers | Device matrix (2.10), sync retry queue pending |
+| 3 | 2026-08-11 | In progress | `award_points` ledger; standings view; streak/achievement/mission engines (tests); achievements+missions seeds; `close_round`/`close_day`/`close_season` deployed + cron scheduled | E2E day sim, achievements eval in close_day, transactionality refinement pending |
+| 4 | 2026-08-11 | In progress | Feed with pagination + card types; post composer; reactions + comments; RLS blocks forged system posts (403 verified) | Media pipeline, system events, Realtime, push pending |
+| 5 | 2026-08-11 | In progress | Nutrition domain + totals; Open Food Facts resolver (tested); barcode scanning; REGISTRAR actions | Food logging flow, custom food, meal photos pending |
+| 6 | 2026-08-11 | In progress | Workout de-dup; NOSOTROS profiles + history stats | Maps, route import, workout detail pending |
+| 7 | 2026-08-11 | In progress | Offline ranking cache; runbook; security sweep (no secrets in repo) | Full offline, performance pass, backup restore test pending |
