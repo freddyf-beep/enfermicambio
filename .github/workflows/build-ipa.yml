@@ -1,0 +1,117 @@
+name: build-ipa
+
+# Generates a signed iOS IPA for physical-device testing.
+#
+# Required repository secrets (Settings -> Secrets and variables -> Actions):
+#   IOS_CERTIFICATE             base64 of a .p12 signing certificate
+#   IOS_CERTIFICATE_PASSWORD    password for that .p12
+#   IOS_PROVISIONING_PROFILE    base64 of a .mobileprovision that includes the
+#                               target iPhone's UDID
+#   IOS_BUNDLE_IDENTIFIER       com.enfermicambio.enfermicambio (optional)
+#
+# When these secrets are not set, the job is skipped and the unsigned CI build
+# (ci.yml) still verifies compilation.
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'ios/**'
+      - 'lib/**'
+      - 'pubspec.yaml'
+      - '.github/workflows/build-ipa.yml'
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    name: Build signed IPA
+    runs-on: macos-latest
+    timeout-minutes: 45
+    if: ${{ secrets.IOS_CERTIFICATE != '' && secrets.IOS_PROVISIONING_PROFILE != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Prepare environment placeholders
+        run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
+        shell: pwsh
+
+      - name: Import signing certificate
+        env:
+          IOS_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+        run: |
+          CERT_PATH=$RUNNER_TEMP/build_certificate.p12
+          echo -n "$IOS_CERTIFICATE" | base64 --decode --output $CERT_PATH
+          KEYCHAIN=$RUNNER_TEMP/app-signing.keychain-db
+          security create-keychain -p "$IOS_CERTIFICATE_PASSWORD" $KEYCHAIN
+          security default-keychain -s $KEYCHAIN
+          security unlock-keychain -p "$IOS_CERTIFICATE_PASSWORD" $KEYCHAIN
+          security import $CERT_PATH -P "$IOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$IOS_CERTIFICATE_PASSWORD" $KEYCHAIN
+
+      - name: Install provisioning profile
+        env:
+          IOS_PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          PROVISIONING_PATH=$RUNNER_TEMP/build.mobileprovision
+          echo -n "$IOS_PROVISIONING_PROFILE" | base64 --decode --output $PROVISIONING_PATH
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $PROVISIONING_PATH ~/Library/MobileDevice/Provisioning\ Profiles/build.mobileprovision
+
+      - name: Build iOS app (signed)
+        run: flutter build ios --release --no-codesign
+
+      - name: Export signed IPA
+        env:
+          IOS_BUNDLE_IDENTIFIER: ${{ secrets.IOS_BUNDLE_IDENTIFIER }}
+        run: |
+          if [ -z "$IOS_BUNDLE_IDENTIFIER" ]; then
+            IOS_BUNDLE_IDENTIFIER="com.enfermicambio.enfermicambio"
+          fi
+          EXPORT_OPTIONS=$RUNNER_TEMP/ExportOptions.plist
+          cat > "$EXPORT_OPTIONS" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>ad-hoc</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>compileBitcode</key>
+            <false/>
+            <key>teamID</key>
+            <string></string>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportOptionsPlist "$EXPORT_OPTIONS" \
+            -exportPath build/ios/ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: enfermicambio-ipa
+          path: build/ios/ipa/*.ipa
+
+      - name: Show signing identity
+        run: |
+          echo "Certificate identity:"
+          security find-identity -v -p codesigning $RUNNER_TEMP/app-signing.keychain-db
+          echo "Provisioning profile:"
+          security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/build.mobileprovision \
+            | grep -E 'UUID|ExpirationDate|TeamName|Name' | head -10
