@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app/data/dashboard_cache.dart';
+import '../../feed/data/supabase_post_repository.dart';
 import '../../feed/domain/feed_models.dart';
 import '../../feed/presentation/feed_list.dart';
 import '../../health/domain/health_models.dart';
@@ -20,6 +21,7 @@ class HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<HomeTab> {
   late final DashboardRepository _repository;
+  late final SupabasePostRepository _posts;
   AppDashboardData? _data;
   AsyncViewStatus? _status;
   DashboardCache? _cache;
@@ -29,6 +31,7 @@ class _HomeTabState extends State<HomeTab> {
   void initState() {
     super.initState();
     _repository = DashboardRepository(client: Supabase.instance.client);
+    _posts = SupabasePostRepository(client: Supabase.instance.client);
     _init();
   }
 
@@ -74,6 +77,63 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
+  Future<void> _react(FeedPost post) async {
+    final userId = Supabase.instance.client.auth.currentSession?.user.id;
+    if (userId == null) return;
+    try {
+      await _posts.addReaction(postId: post.id, userId: userId, emoji: '❤️');
+      await _load();
+    } on Exception {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not react. Try again.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _comment(FeedPost post) async {
+    final userId = Supabase.instance.client.auth.currentSession?.user.id;
+    if (userId == null) return;
+    final controller = TextEditingController();
+    final body = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Comment'),
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          maxLength: 1000,
+          decoration: const InputDecoration(
+            hintText: 'Write a comment',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+    if (body == null || body.isEmpty) return;
+    try {
+      await _posts.addComment(postId: post.id, authorId: userId, body: body);
+      await _load();
+    } on Exception {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not comment. Try again.')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_data == null) {
@@ -115,7 +175,11 @@ class _HomeTabState extends State<HomeTab> {
             const SizedBox(height: 24),
             Text('Feed', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 4),
-            FeedList(posts: data.feedPage.posts),
+            FeedList(
+              posts: data.feedPage.posts,
+              onReact: _react,
+              onComment: _comment,
+            ),
           ],
         ),
       ),

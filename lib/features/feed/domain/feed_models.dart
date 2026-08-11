@@ -23,6 +23,8 @@ class FeedPost {
     this.caption,
     this.authorAvatarUrl,
     this.mediaUrls = const [],
+    this.reactionCount = 0,
+    this.commentCount = 0,
   });
 
   final String id;
@@ -34,6 +36,8 @@ class FeedPost {
   final bool isSystem;
   final String? caption;
   final List<String> mediaUrls;
+  final int reactionCount;
+  final int commentCount;
 }
 
 class FeedPage {

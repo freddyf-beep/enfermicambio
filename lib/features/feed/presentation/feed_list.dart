@@ -10,12 +10,16 @@ class FeedList extends StatelessWidget {
     this.hasMore = false,
     this.onLoadMore,
     this.isLoadingMore = false,
+    this.onReact,
+    this.onComment,
   });
 
   final List<FeedPost> posts;
   final bool hasMore;
   final VoidCallback? onLoadMore;
   final bool isLoadingMore;
+  final void Function(FeedPost post)? onReact;
+  final void Function(FeedPost post)? onComment;
 
   @override
   Widget build(BuildContext context) {
@@ -45,16 +49,22 @@ class FeedList extends StatelessWidget {
             ),
           );
         }
-        return _PostCard(post: posts[index]);
+        return _PostCard(
+          post: posts[index],
+          onReact: onReact,
+          onComment: onComment,
+        );
       },
     );
   }
 }
 
 class _PostCard extends StatelessWidget {
-  const _PostCard({required this.post});
+  const _PostCard({required this.post, this.onReact, this.onComment});
 
   final FeedPost post;
+  final void Function(FeedPost post)? onReact;
+  final void Function(FeedPost post)? onComment;
 
   @override
   Widget build(BuildContext context) {
@@ -131,6 +141,28 @@ class _PostCard extends StatelessWidget {
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.outline,
               ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (onReact != null) ...[
+                  IconButton(
+                    onPressed: () => onReact!(post),
+                    icon: const Icon(Icons.favorite_outline),
+                    tooltip: 'React',
+                  ),
+                  if (post.reactionCount > 0) Text('${post.reactionCount}'),
+                  const SizedBox(width: 8),
+                ],
+                if (onComment != null) ...[
+                  IconButton(
+                    onPressed: () => onComment!(post),
+                    icon: const Icon(Icons.comment_outlined),
+                    tooltip: 'Comment',
+                  ),
+                  if (post.commentCount > 0) Text('${post.commentCount}'),
+                ],
+              ],
             ),
           ],
         ),

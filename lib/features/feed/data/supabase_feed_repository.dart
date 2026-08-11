@@ -23,7 +23,8 @@ class SupabaseFeedRepository implements FeedRepository {
         .select(
           'id, author_id, post_type, caption, created_at, system_generated, '
           'profiles!posts_author_id_fkey(display_name, avatar_url), '
-          'post_media(url, media_type, sort_order)',
+          'post_media(url, media_type, sort_order), '
+          'reactions(count), comments(count)',
         );
     if (before != null) {
       query = query.lt('created_at', before);
@@ -52,11 +53,22 @@ class SupabaseFeedRepository implements FeedRepository {
             isSystem: row['system_generated'] as bool,
             caption: row['caption'] as String?,
             mediaUrls: media,
+            reactionCount: _count(row['reactions']),
+            commentCount: _count(row['comments']),
           );
         })
         .toList(growable: false);
 
     return FeedPage(posts: posts, nextCursor: nextCursor);
+  }
+
+  int _count(dynamic rows) {
+    if (rows is! List || rows.isEmpty) return 0;
+    final first = rows.first;
+    if (first is Map<String, dynamic>) {
+      return ((first['count'] as num?) ?? 0).toInt();
+    }
+    return 0;
   }
 
   PostType _mapType(String type) {
