@@ -3,7 +3,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
+import '../data/supabase_history_repository.dart';
 import '../data/supabase_profile_repository.dart';
+import '../domain/profile_history_stats.dart';
 import '../domain/profile_models.dart';
 
 class AboutTab extends StatefulWidget {
@@ -15,13 +17,16 @@ class AboutTab extends StatefulWidget {
 
 class _AboutTabState extends State<AboutTab> {
   late final SupabaseProfileRepository _repository;
+  late final SupabaseHistoryRepository _history;
   List<UserProfile>? _profiles;
+  final Map<String, ProfileHistoryStats> _stats = {};
   AsyncViewStatus? _status;
 
   @override
   void initState() {
     super.initState();
     _repository = SupabaseProfileRepository(client: Supabase.instance.client);
+    _history = SupabaseHistoryRepository(client: Supabase.instance.client);
     _load();
   }
 
@@ -31,6 +36,10 @@ class _AboutTabState extends State<AboutTab> {
     });
     try {
       final profiles = await _repository.fetchAll();
+      for (final profile in profiles) {
+        final stats = await _history.statsFor(userId: profile.id);
+        _stats[profile.id] = stats;
+      }
       if (!mounted) return;
       setState(() {
         _profiles = profiles;
@@ -65,7 +74,8 @@ class _AboutTabState extends State<AboutTab> {
           physics: const AlwaysScrollableScrollPhysics(),
           itemCount: _profiles!.length,
           itemBuilder: (context, index) {
-            return _ProfileTile(profile: _profiles![index]);
+            final profile = _profiles![index];
+            return _ProfileTile(profile: profile, stats: _stats[profile.id]);
           },
         ),
       ),
@@ -74,29 +84,60 @@ class _AboutTabState extends State<AboutTab> {
 }
 
 class _ProfileTile extends StatelessWidget {
-  const _ProfileTile({required this.profile});
+  const _ProfileTile({required this.profile, this.stats});
 
   final UserProfile profile;
+  final ProfileHistoryStats? stats;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ListTile(
-      leading: CircleAvatar(
-        radius: 24,
-        backgroundColor: theme.colorScheme.primaryContainer,
-        child: Text(
-          profile.displayName.isEmpty
-              ? '?'
-              : profile.displayName[0].toUpperCase(),
+    final stats = this.stats;
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: ListTile(
+        leading: CircleAvatar(
+          radius: 24,
+          backgroundColor: theme.colorScheme.primaryContainer,
+          child: Text(
+            profile.displayName.isEmpty
+                ? '?'
+                : profile.displayName[0].toUpperCase(),
+          ),
+        ),
+        title: Text(profile.displayName),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Step goal ${profile.dailyStepTarget} - '
+              'Calorie target ${profile.dailyCalorieTarget}',
+              style: theme.textTheme.bodySmall,
+            ),
+            if (stats != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Lifetime: ${_format(stats.lifetimeSteps)} steps - '
+                '${_formatKm(stats.lifetimeDistanceM)} km - '
+                '${stats.workoutCount} workouts - '
+                '${stats.seasonWins} season wins',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ],
         ),
       ),
-      title: Text(profile.displayName),
-      subtitle: Text(
-        'Step goal ${profile.dailyStepTarget} - '
-        'Calorie target ${profile.dailyCalorieTarget}',
-        style: theme.textTheme.bodySmall,
-      ),
     );
+  }
+
+  String _format(int value) {
+    if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}k';
+    return value.toString();
+  }
+
+  String _formatKm(double meters) {
+    final km = meters / 1000;
+    if (km >= 100) return km.round().toString();
+    return km.toStringAsFixed(1);
   }
 }
