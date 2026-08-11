@@ -1,23 +1,10 @@
 name: build-ipa
 
-# Generates a signed iOS IPA for physical-device testing using fastlane match.
-# Works with a free Apple developer account (Personal Team); the resulting
-# development build installs on the registered device for up to 7 days.
+# Builds an unsigned IPA for sideloading with Sideloadly/AltStore using a free
+# Apple ID (7-day validity, no paid developer account required). Matches the
+# proven flow in the server-dashboard-ios project.
 #
-# Required repository secrets (Settings -> Secrets and variables -> Actions):
-#   MATCH_GIT_URL           URL of the private git repo holding certificates
-#                           (e.g. https://github.com/you/ios-certificates)
-#   MATCH_PASSWORD          password used to encrypt the match repo
-#   FASTLANE_USER           Apple ID email
-#   FASTLANE_PASSWORD       Apple ID password, or an app-specific password
-#   MATCH_GIT_BASIC_AUTHORIZATION
-#                           base64 "user:token" to access the private repo
-#   TEAM_ID                 your Apple developer team ID (optional)
-#
-# First-time setup (run once, from a Mac with Xcode):
-#   fastlane match init --git_url <MATCH_GIT_URL> --type development
-#   fastlane match development
-#   fastlane match development --readonly   # verify
+# No repository secrets required.
 
 on:
   push:
@@ -31,10 +18,9 @@ on:
 
 jobs:
   build-ipa:
-    name: Build signed IPA (fastlane match)
+    name: Build unsigned IPA for sideloading
     runs-on: macos-latest
     timeout-minutes: 45
-    if: ${{ secrets.MATCH_GIT_URL != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,80 +38,74 @@ jobs:
         run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
         shell: pwsh
 
-      - name: Install fastlane
+      - name: Build iOS app (device, unsigned)
         run: |
-          gem install fastlane
-          fastlane --version
-
-      - name: Match development certificates
-        env:
-          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
-          FASTLANE_PASSWORD: ${{ secrets.FASTLANE_PASSWORD }}
-          MATCH_GIT_BASIC_AUTHORIZATION: ${{ secrets.MATCH_GIT_BASIC_AUTHORIZATION }}
-          TEAM_ID: ${{ secrets.TEAM_ID }}
-        run: |
-          MATCH_ARGS="--readonly --type development --app_identifier com.enfermicambio.enfermicambio"
-          if [ -n "$TEAM_ID" ]; then
-            MATCH_ARGS="$MATCH_ARGS --team_id $TEAM_ID"
-          fi
-          fastlane match development $MATCH_ARGS
-          # Add the team to the Xcode project so signing resolves automatically.
-          /usr/libexec/PlistBuddy -c "Print :TeamIdentifier:0" \
-            ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null \
-            | head -1
-          echo "Provisioning profiles installed:"
-          ls ~/Library/MobileDevice/Provisioning\ Profiles/ | head -5
-
-      - name: Build iOS app (archive)
-        env:
-          TEAM_ID: ${{ secrets.TEAM_ID }}
-        run: |
-          if [ -n "$TEAM_ID" ]; then
-            sed -i '' \
-              "s/PRODUCT_BUNDLE_IDENTIFIER = com.enfermicambio.enfermicambio;/PRODUCT_BUNDLE_IDENTIFIER = com.enfermicambio.enfermicambio;\n\t\t\t\tDEVELOPMENT_TEAM = $TEAM_ID;/" \
-              ios/Runner.xcodeproj/project.pbxproj
-          fi
+          # --no-codesign produces an unsigned .app; the device slice is then
+          # packaged and sideloaded with a free Apple ID.
           flutter build ios --release --no-codesign
 
-      - name: Export signed IPA
-        env:
-          TEAM_ID: ${{ secrets.TEAM_ID }}
+      - name: Package unsigned IPA
         run: |
-          EXPORT_OPTIONS=$RUNNER_TEMP/ExportOptions.plist
-          cat > "$EXPORT_OPTIONS" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>development</string>
-            <key>signingStyle</key>
-            <string>automatic</string>
-            <key>stripSwiftSymbols</key>
-            <true/>
-            <key>compileBitcode</key>
-            <false/>
-            <key>teamID</key>
-            <string>${TEAM_ID:-}</string>
-          </dict>
-          </plist>
-          EOF
-          xcodebuild -exportArchive \
-            -archivePath build/ios/archive/Runner.xcarchive \
-            -exportOptionsPlist "$EXPORT_OPTIONS" \
-            -exportPath build/ios/ipa
+          APP_PATH=$(find build/ios/iphoneos -name "*.app" -maxdepth 2 | head -1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find build/ios -name "*.app" -maxdepth 3 | head -1)
+          fi
+          echo "App bundle: $APP_PATH"
+
+          # The executable name matches the Flutter target (Runner) or the
+          # app name depending on PRODUCT_NAME; resolve it from the plist.
+          EXEC_NAME=$(/usr/libexec/PlistBuddy -c "Print CFBundleExecutable" "$APP_PATH/Info.plist")
+          echo "CFBundleExecutable: $EXEC_NAME"
+          EXEC_PATH="$APP_PATH/$EXEC_NAME"
+
+          echo "=== Built Info.plist ==="
+          cat "$APP_PATH/Info.plist"
+
+          echo "=== Binary info ==="
+          file "$EXEC_PATH"
+          lipo -info "$EXEC_PATH"
+
+          # Keep only the arm64 slice for physical devices.
+          lipo "$EXEC_PATH" -thin arm64 -output "/tmp/${EXEC_NAME}_arm64" 2>/dev/null \
+            || cp "$EXEC_PATH" "/tmp/${EXEC_NAME}_arm64"
+          echo "After lipo -thin:"
+          file "/tmp/${EXEC_NAME}_arm64"
+
+          # Retag simulator binary to device platform.
+          vtool -set-build-version ios 15.0 15.0 -replace \
+            -output "/tmp/${EXEC_NAME}_device" \
+            "/tmp/${EXEC_NAME}_arm64" 2>/dev/null || true
+          echo "After vtool:"
+          vtool -show-build "/tmp/${EXEC_NAME}_device" 2>/dev/null || true
+
+          # Replace executable with the device-tagged one.
+          cp "/tmp/${EXEC_NAME}_device" "$EXEC_PATH"
+          chmod +x "$EXEC_PATH"
+
+          # Remove signing artifacts so Sideloadly signs cleanly.
+          rm -rf "$APP_PATH/_CodeSignature"
+          rm -f "$APP_PATH/embedded.mobileprovision"
+
+          # Ensure the required Info.plist keys are present for sideloading.
+          /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable $EXEC_NAME" "$APP_PATH/Info.plist" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :UIFileSharingEnabled bool true" "$APP_PATH/Info.plist" 2>/dev/null || true
+          /usr/libexec/PlistBuddy -c "Add :LSSupportsOpeningDocumentsInPlace bool true" "$APP_PATH/Info.plist" 2>/dev/null || true
+
+          echo "=== Final app contents ==="
+          ls -la "$APP_PATH/"
+
+          # Package IPA: Payload/<AppName>.app
+          rm -rf Payload
+          mkdir -p Payload
+          cp -r "$APP_PATH" "Payload/${EXEC_NAME}.app"
+          echo "Executable exists: $(test -f Payload/${EXEC_NAME}.app/$EXEC_NAME && echo YES || echo NO)"
+          echo "CFBundleExecutable in packaged plist: $(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' Payload/${EXEC_NAME}.app/Info.plist)"
+          zip -r Enfermicambio.ipa Payload/
+          ls -lh Enfermicambio.ipa
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: enfermicambio-ipa
-          path: build/ios/ipa/*.ipa
-
-      - name: Show signing identity
-        run: |
-          security find-identity -v -p codesigning
-          echo "Installed profiles:"
-          security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision \
-            2>/dev/null | grep -E 'UUID|ExpirationDate|TeamName|Name' | head -10
+          path: Enfermicambio.ipa
+          retention-days: 30
