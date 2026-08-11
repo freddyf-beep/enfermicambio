@@ -7,13 +7,6 @@ name: build-ipa
 # No repository secrets required.
 
 on:
-  push:
-    branches: [master, main]
-    paths:
-      - 'ios/**'
-      - 'lib/**'
-      - 'pubspec.yaml'
-      - '.github/workflows/build-ipa.yml'
   workflow_dispatch:
 
 jobs:

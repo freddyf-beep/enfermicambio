@@ -4,6 +4,7 @@ on:
   push:
     branches: [master, main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   analyze-and-test:
@@ -85,6 +86,10 @@ jobs:
     name: Build iOS (unsigned)
     runs-on: macos-latest
     timeout-minutes: 40
+    # macOS runners consume the private-repository quota quickly. Run iOS
+    # verification deliberately from Actions -> Run workflow; Android and
+    # analyzer/test jobs remain automatic on every push.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
