@@ -165,6 +165,25 @@ async function handle(
     }, { onConflict: "user_id,streak_type" });
   }
 
+  // Evaluate the day's rotating missions and lifetime achievements.
+  // Both functions are idempotent through the ledger; retries are safe.
+  const { error: missionErr } = await supabaseAdmin.rpc("evaluate_missions", {
+    p_date: competitionDate,
+  });
+  if (missionErr) throw new Error(`mission evaluation failed: ${missionErr.message}`);
+
+  const { data: evaluatedProfiles, error: profilesErr } = await supabaseAdmin
+    .from("profiles")
+    .select("id");
+  if (profilesErr) throw new Error(`profiles read failed: ${profilesErr.message}`);
+  for (const profile of evaluatedProfiles ?? []) {
+    const { error: achErr } = await supabaseAdmin.rpc("evaluate_achievements", {
+      p_user_id: profile.id,
+      p_date: competitionDate,
+    });
+    if (achErr) throw new Error(`achievement evaluation failed: ${achErr.message}`);
+  }
+
   // Publish the daily result post.
   const winnerId = rows.length > 0 ? rows[0].user_id : null;
   let winnerName = "No one";
@@ -185,6 +204,65 @@ async function handle(
       (rows.length > 0 ? ` with ${rows[0].daily_steps} steps.` : "."),
     system_generated: true,
   });
+
+  // Notify all four users about the daily result (idempotent per key).
+  const notifKey = `daily_result:${competitionDate}`;
+  const { data: allProfiles } = await supabaseAdmin
+    .from("profiles")
+    .select("id");
+  for (const p of allProfiles ?? []) {
+    const { data: dup } = await supabaseAdmin
+      .from("notifications")
+      .select("id")
+      .eq("user_id", p.id)
+      .eq("type", "round_result")
+      .eq("payload->>key", notifKey)
+      .limit(1);
+    if ((dup?.length ?? 0) > 0) continue;
+    const { error: notifErr } = await supabaseAdmin.rpc("insert_notification", {
+      p_user_id: p.id,
+      p_type: "round_result",
+      p_title: `${winnerName} se lleva el día`,
+      p_body:
+        rows.length > 0
+          ? `🏆 ${winnerName} se lleva el día con ${rows[0].daily_steps.toLocaleString("es-CL")} pasos.`
+          : `🏁 Hoy no hubo actividad registrada.`,
+      p_payload: {
+        key: notifKey,
+        competition_date: competitionDate,
+        winner_id: winnerId,
+      },
+    });
+    if (notifErr) throw new Error(`daily notify failed: ${notifErr.message}`);
+  }
+
+  // Personal daily-goal notifications for everyone who met their target
+  // (same dedupe key as generate_events, so they never double up).
+  for (const row of rows) {
+    const profile = (profiles ?? []).find((p) => p.id === row.user_id);
+    const target = profile?.daily_step_target ?? stepGoalDefault;
+    if (row.daily_steps < target) continue;
+    const goalKey = `goal:${competitionDate}`;
+    const { data: dup } = await supabaseAdmin
+      .from("notifications")
+      .select("id")
+      .eq("user_id", row.user_id)
+      .eq("type", "daily_goal")
+      .eq("payload->>key", goalKey)
+      .limit(1);
+    if ((dup?.length ?? 0) > 0) continue;
+    const { error: goalNotifErr } = await supabaseAdmin.rpc(
+      "insert_notification",
+      {
+        p_user_id: row.user_id,
+        p_type: "daily_goal",
+        p_title: "¡Meta cumplida!",
+        p_body: `✅ Cumpliste tu meta de ${target.toLocaleString("es-CL")} pasos.`,
+        p_payload: { key: goalKey, steps: row.daily_steps, competition_date: competitionDate },
+      },
+    );
+    if (goalNotifErr) throw new Error(`goal notify failed: ${goalNotifErr.message}`);
+  }
 
   return Response.json({ date: competitionDate, awarded });
 }
