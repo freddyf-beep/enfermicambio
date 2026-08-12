@@ -255,6 +255,10 @@ class _HealthSetupScreenState extends State<HealthSetupScreen>
               children: [
                 _PlatformCard(snapshot: snapshot),
                 const SizedBox(height: 16),
+                if (snapshot.platform == 'ios') ...[
+                  const _HealthAutoExportBridgeCard(),
+                  const SizedBox(height: 16),
+                ],
                 if (_messageFor(snapshot) != null) ...[
                   _InfoCard(
                     icon: _iconFor(snapshot.state),
@@ -357,6 +361,27 @@ class _HealthSetupScreenState extends State<HealthSetupScreen>
         'La última lectura fue correcta. Puedes actualizarla cuando quieras.',
       HealthSetupState.available => null,
     };
+  }
+}
+
+class _HealthAutoExportBridgeCard extends StatelessWidget {
+  const _HealthAutoExportBridgeCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      color: scheme.secondaryContainer,
+      child: const ListTile(
+        leading: Icon(Icons.cloud_upload_outlined),
+        title: Text('Importación con Health Auto Export'),
+        subtitle: Text(
+          'En iPhone, esta instalación puede usar Health Auto Export como puente. '
+          'La app envía pasos, calorías, distancia, entrenamientos y rutas al ranking; '
+          'no necesitas conceder HealthKit a esta copia de Enfermicambio.',
+        ),
+      ),
+    );
   }
 }
 

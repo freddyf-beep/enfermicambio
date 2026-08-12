@@ -1,8 +1,8 @@
 name: build-ipa
 
 # Builds an IPA for sideloading with Sideloadly/AltStore using a free Apple ID
-# (7-day validity, no paid developer account required). The cloud build is
-# ad-hoc signed so HealthKit remains declared for the final device re-sign.
+# (7-day validity, no paid developer account required). Free re-signing does not
+# make HealthKit available; iPhone health data uses the Health Auto Export bridge.
 #
 # No repository secrets required.
 
@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-ipa:
-    name: Build HealthKit-ready IPA for sideloading
+    name: Build IPA with Health Auto Export bridge
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -42,7 +42,7 @@ jobs:
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 
-      - name: Sign entitlements and package IPA
+      - name: Package IPA
         run: |
           APP_PATH=$(find build/ios/iphoneos -name "*.app" -maxdepth 2 | head -1)
           if [ -z "$APP_PATH" ]; then
@@ -80,9 +80,9 @@ jobs:
           cp "/tmp/${EXEC_NAME}_device" "$EXEC_PATH"
           chmod +x "$EXEC_PATH"
 
-          # Embed the requested HealthKit entitlement in an ad-hoc signature.
-          # Sideloading tools can then read and request the same entitlement
-          # when they create the device provisioning profile.
+          # Keep the HealthKit declaration for native/paid-signing builds. A
+          # free re-sign may remove it; the production iPhone flow uses the
+          # Health Auto Export bridge documented in docs/health_auto_export_setup.md.
           codesign --force --deep --sign - \
             --entitlements "$GITHUB_WORKSPACE/ios/Runner/Runner.entitlements" \
             --generate-entitlement-der \

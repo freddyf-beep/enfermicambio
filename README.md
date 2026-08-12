@@ -131,6 +131,14 @@ supabase db push
 
 Configuration comes from a `.env` file based on `.env.example` (placeholders only, never committed with real values) and from the backend `app_config` table for game tuning.
 
+### iPhone health bridge
+
+When the iOS build is installed with a free Apple ID, HealthKit permissions can remain
+unavailable after re-signing. The supported private fallback is the existing Health Auto
+Export app, which sends JSON to the Supabase bridge and feeds the same ranking tables used by
+Enfermicambio. Follow [the iPhone bridge setup](docs/health_auto_export_setup.md); never put
+the private ingestion token in source control.
+
 Requirements: Flutter stable, Xcode with signing for the iPhones, Android SDK with a Health Connect-capable device, a Supabase project, and physical test devices. Health behavior cannot be fully validated on simulators.
 
 ## Development Status
