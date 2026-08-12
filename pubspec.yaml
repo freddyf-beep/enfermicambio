@@ -36,7 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   health: ^13.3.1
   supabase_flutter: ^2.17.1
-  timezone: ^0.11.1
+  timezone: ^0.10.1
   intl: ^0.20.3
   flutter_dotenv: ^5.2.1
   flutter_map: ^7.0.2
@@ -44,8 +44,10 @@ dependencies:
   http: ^1.2.2
   latlong2: ^0.9.1
   mobile_scanner: ^5.2.3
+  permission_handler: ^11.3.1
   shared_preferences: ^2.3.3
-
+  flutter_local_notifications: ^19.5.0
+ 
 dev_dependencies:
   flutter_test:
     sdk: flutter

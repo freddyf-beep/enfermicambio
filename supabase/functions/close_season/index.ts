@@ -86,6 +86,36 @@ async function handle(
     if (champErr) throw new Error(`champion post failed: ${champErr.message}`);
   }
 
+  // Notify all four users about the season result (idempotent per key).
+  const notifKey = `season:${season.id}`;
+  const { data: allProfiles } = await supabaseAdmin
+    .from("profiles")
+    .select("id");
+  for (const p of allProfiles ?? []) {
+    const { data: dup } = await supabaseAdmin
+      .from("notifications")
+      .select("id")
+      .eq("user_id", p.id)
+      .eq("type", "season")
+      .eq("payload->>key", notifKey)
+      .limit(1);
+    if ((dup?.length ?? 0) > 0) continue;
+    const { error: notifErr } = await supabaseAdmin.rpc("insert_notification", {
+      p_user_id: p.id,
+      p_type: "season",
+      p_title: "Fin de temporada",
+      p_body: champion
+        ? `👑 ${champion.display_name} ganó la temporada con ${Math.round(champion.total_points)} puntos.`
+        : `🏁 La temporada terminó. ¡A por la siguiente!`,
+      p_payload: {
+        key: notifKey,
+        season_id: season.id,
+        champion_id: champion?.user_id ?? null,
+      },
+    });
+    if (notifErr) throw new Error(`season notify failed: ${notifErr.message}`);
+  }
+
   // Create the next season.
   const durationMs =
     new Date(season.ends_at).getTime() - new Date(season.starts_at).getTime();

@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:health/health.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:timezone/timezone.dart' as timezone;
 
 import '../domain/health_models.dart';
@@ -21,27 +24,16 @@ class HealthPluginRepository implements HealthRepository {
     HealthDataType.DISTANCE_WALKING_RUNNING,
     HealthDataType.EXERCISE_TIME,
   ];
+
+  static const _readPermissions = <HealthDataAccess>[
+    HealthDataAccess.READ,
+    HealthDataAccess.READ,
+    HealthDataAccess.READ,
+    HealthDataAccess.READ,
+  ];
+
   @override
-  Future<bool> requestStepReadPermission() async {
-    try {
-      await _configure();
-      return await _health
-          .requestAuthorization(
-            const [
-              HealthDataType.STEPS,
-              HealthDataType.ACTIVE_ENERGY_BURNED,
-              HealthDataType.DISTANCE_WALKING_RUNNING,
-              HealthDataType.EXERCISE_TIME,
-            ],
-            permissions: const [HealthDataAccess.READ],
-          )
-          .timeout(permissionTimeout);
-    } on TimeoutException {
-      return false;
-    } on Exception {
-      return false;
-    }
-  }
+  Future<bool> requestStepReadPermission() => requestAllPermissions();
 
   @override
   Future<HealthReadResult> readToday({
@@ -71,6 +63,7 @@ class HealthPluginRepository implements HealthRepository {
         samples: samples,
         lastSyncedAt: DateTime.now().toUtc(),
         sourcePlatform: _platformName,
+        message: null,
       );
     } on HealthException catch (error) {
       return HealthReadResult(
@@ -96,10 +89,25 @@ class HealthPluginRepository implements HealthRepository {
     final platform = _platformName;
     try {
       await _configure();
+      if (Platform.isAndroid) {
+        final available = await _health
+            .getHealthConnectSdkStatus()
+            .timeout(permissionTimeout);
+        if (available != HealthConnectSdkStatus.sdkAvailable) {
+          return HealthSetupSnapshot(
+            platform: platform,
+            healthAvailable: false,
+            grantedTypes: const {},
+            message:
+                'Health Connect no está disponible. Instálalo o actívalo en este dispositivo.',
+          );
+        }
+      }
+
       final granted = <HealthMetricType>{};
       for (final type in _readTypes) {
         final has = await _health
-            .hasPermissions([type])
+            .hasPermissions([type], permissions: [HealthDataAccess.READ])
             .timeout(permissionTimeout);
         if (has == true) {
           granted.add(_mapType(type));
@@ -132,15 +140,28 @@ class HealthPluginRepository implements HealthRepository {
   Future<bool> requestAllPermissions() async {
     try {
       await _configure();
+      if (Platform.isAndroid) {
+        final activityStatus = await Permission.activityRecognition.request();
+        if (!activityStatus.isGranted) {
+          return false;
+        }
+        final available = await _health
+            .getHealthConnectSdkStatus()
+            .timeout(permissionTimeout);
+        if (available != HealthConnectSdkStatus.sdkAvailable) {
+          return false;
+        }
+      }
       return await _health
           .requestAuthorization(
             _readTypes,
-            permissions: const [HealthDataAccess.READ],
+            permissions: _readPermissions,
           )
           .timeout(permissionTimeout);
     } on TimeoutException {
       return false;
-    } on Exception {
+    } on Exception catch (error) {
+      debugPrint('Health permission request failed: $error');
       return false;
     }
   }

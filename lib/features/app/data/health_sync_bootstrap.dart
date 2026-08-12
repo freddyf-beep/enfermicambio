@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 import '../../health/application/health_sync_coordinator.dart';
 import '../../health/application/health_sync_service.dart';
@@ -32,9 +35,39 @@ class HealthSyncBootstrap {
   static void syncOnResume() {
     try {
       final coordinator = ensureCoordinator();
-      coordinator.sync();
+      unawaited(
+        coordinator.sync().then((_) {
+          fireGenerateEvents();
+        }).catchError((Object _) {
+          // Best effort on resume; failures surface on the next manual sync.
+        }),
+      );
     } on Exception {
       // Best effort on resume; failures surface on the next manual sync.
+    }
+  }
+
+  /// Asks the server to evaluate competition events (overtakes, milestones,
+  /// records, daily goal) for the current user. Fire-and-forget; the server
+  /// is authoritative and idempotent, so a missed call only delays events.
+  static Future<void> fireGenerateEvents() async {
+    try {
+      final client = Supabase.instance.client;
+      final userId = client.auth.currentSession?.user.id;
+      if (userId == null) return;
+      final now = tz.TZDateTime.now(
+        tz.getLocation('America/Santiago'),
+      );
+      final date =
+          '${now.year.toString().padLeft(4, '0')}-'
+          '${now.month.toString().padLeft(2, '0')}-'
+          '${now.day.toString().padLeft(2, '0')}';
+      await client.functions.invoke(
+        'generate_events',
+        body: {'user_id': userId, 'date': date},
+      );
+    } on Exception {
+      // Best effort; generate_events can also be triggered by close_day.
     }
   }
 }

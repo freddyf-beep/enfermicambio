@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
 
@@ -14,7 +15,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final _passwordController = TextEditingController(text: '123456');
   bool _isBusy = false;
   AsyncViewStatus? _status;
 
@@ -36,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() {
           _isBusy = false;
           _status = const AsyncViewStatus.retryableFailure(
-            'Sign in with Google was cancelled.',
+            'El inicio de sesión con Google fue cancelado.',
           );
         });
         return;
@@ -59,14 +60,18 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _signInWithEmail() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) return;
+
     setState(() {
       _isBusy = true;
       _status = null;
     });
     try {
       await Supabase.instance.client.auth.signInWithPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
+        email: email,
+        password: password,
       );
       setState(() {
         _isBusy = false;
@@ -84,6 +89,16 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _quickFillUser(String email, String name) {
+    setState(() {
+      _emailController.text = email;
+      _passwordController.text = '123456';
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Cargado usuario $name ($email)')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -95,36 +110,96 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Icon(
-                  Icons.health_and_safety,
-                  size: 72,
-                  color: Theme.of(context).colorScheme.primary,
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight.withOpacity(0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.directions_run,
+                    size: 64,
+                    color: AppColors.primaryLight,
+                  ),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   'Enfermicambio',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.5,
+                      ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
-                  'A private competition for exactly four friends.',
+                  'Competencia fitness privada entre 4 amigos.',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
                 FilledButton.icon(
                   onPressed: _isBusy ? null : _signInWithGoogle,
-                  icon: const Icon(Icons.g_mobiledata),
-                  label: const Text('Continue with Google'),
+                  icon: const Icon(Icons.g_mobiledata, size: 28),
+                  label: const Text('Continuar con Google'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    const Expanded(child: Divider()),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'O inicio rápido para los 4 usuarios',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    const Expanded(child: Divider()),
+                  ],
+                ),
+                const SizedBox(height: 12),
+
+                // Quick login buttons for the 4 users
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    ActionChip(
+                      avatar: const Icon(Icons.person, size: 16),
+                      label: const Text('Freddy'),
+                      onPressed: () => _quickFillUser('udefret12@gmail.com', 'Freddy'),
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.person, size: 16),
+                      label: const Text('Felipe'),
+                      onPressed: () => _quickFillUser('felipe@gmail.com', 'Felipe'),
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.person, size: 16),
+                      label: const Text('Cristian'),
+                      onPressed: () => _quickFillUser('cristiancarrillo262@gmail.com', 'Cristian'),
+                    ),
+                    ActionChip(
+                      avatar: const Icon(Icons.person, size: 16),
+                      label: const Text('Samir'),
+                      onPressed: () => _quickFillUser('Samineiror123@gmail.com', 'Samir'),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
                 TextField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   autocorrect: false,
                   decoration: const InputDecoration(
-                    labelText: 'Email',
+                    labelText: 'Correo electrónico',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -133,14 +208,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _passwordController,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: 'Password',
+                    labelText: 'Contraseña (por defecto 123456)',
                     border: OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 16),
                 OutlinedButton(
                   onPressed: _isBusy ? null : _signInWithEmail,
-                  child: const Text('Sign in'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('Iniciar Sesión'),
                 ),
                 if (_isBusy) ...[
                   const SizedBox(height: 24),

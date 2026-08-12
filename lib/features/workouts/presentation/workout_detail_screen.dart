@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
 import '../data/supabase_workout_repository.dart';
@@ -70,19 +71,19 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
         'post_type': workout.routeAvailable ? 'route' : 'workout',
         'caption':
             '${_typeLabel(workout.workoutType)} - ${km.toStringAsFixed(1)} km '
-            'in $minutes min',
+            'en $minutes min',
         'workout_id': workout.id,
         'system_generated': false,
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Published to the feed.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('¡Entrenamiento publicado en el feed!')),
+      );
     } on Exception catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not publish: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo publicar: $error')),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -93,12 +94,12 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   }
 
   String _typeLabel(String type) {
-    return switch (type) {
-      'running' => 'Run',
-      'walking' => 'Walk',
-      'cycling' => 'Ride',
-      'swimming' => 'Swim',
-      _ => type.isEmpty ? 'Workout' : type[0].toUpperCase() + type.substring(1),
+    return switch (type.toLowerCase()) {
+      'running' => 'Carrera',
+      'walking' => 'Caminata',
+      'cycling' => 'Ciclismo',
+      'swimming' => 'Natación',
+      _ => type.isEmpty ? 'Entrenamiento' : type,
     };
   }
 
@@ -106,7 +107,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   Widget build(BuildContext context) {
     final workout = _workout;
     return Scaffold(
-      appBar: AppBar(title: const Text('Workout')),
+      appBar: AppBar(title: const Text('Detalle del Entrenamiento')),
       body: workout == null
           ? AsyncStateView(
               status: _status ?? const AsyncViewStatus.loading(),
@@ -116,27 +117,50 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text(
-                  _typeLabel(workout.workoutType),
-                  style: Theme.of(context).textTheme.headlineSmall,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.fitnessGreen.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.directions_run, color: AppColors.fitnessGreen, size: 28),
+                    ),
+                    const SizedBox(width: 14),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _typeLabel(workout.workoutType),
+                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          '${workout.startedAt.day}/${workout.startedAt.month} ${workout.startedAt.hour}:${workout.startedAt.minute.toString().padLeft(2, '0')}',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '${workout.startedAt.day}/${workout.startedAt.month} '
-                  '${workout.startedAt.hour}:${workout.startedAt.minute.toString().padLeft(2, '0')}',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 _StatsGrid(workout: workout),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 if (workout.routeAvailable) ...[
+                  const Text('Ruta del Recorrido', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 8),
                   RouteMapView(points: _route ?? const []),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
                 ],
                 FilledButton.icon(
                   onPressed: _publishing ? null : _publishToFeed,
                   icon: const Icon(Icons.public),
-                  label: const Text('Publish to feed'),
+                  label: Text(_publishing ? 'Publicando...' : 'Publicar en el Feed'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
                 ),
               ],
             ),
@@ -157,13 +181,15 @@ class _StatsGrid extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: _Stat(label: 'Distance', value: '${km.toStringAsFixed(2)} km'),
+          child: _Stat(label: 'Distancia', value: '${km.toStringAsFixed(2)} km', color: AppColors.fitnessGreen),
         ),
+        const SizedBox(width: 8),
         Expanded(
-          child: _Stat(label: 'Duration', value: '$minutes min'),
+          child: _Stat(label: 'Duración', value: '$minutes min', color: AppColors.primaryLight),
         ),
+        const SizedBox(width: 8),
         Expanded(
-          child: _Stat(label: 'Active kcal', value: kcal.round().toString()),
+          child: _Stat(label: 'Calorías', value: '${kcal.round()} kcal', color: AppColors.streakOrange),
         ),
       ],
     );
@@ -171,10 +197,11 @@ class _StatsGrid extends StatelessWidget {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
+  const _Stat({required this.label, required this.value, required this.color});
 
   final String label;
   final String value;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
@@ -183,9 +210,17 @@ class _Stat extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Column(
           children: [
-            Text(value, style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              value,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color),
+            ),
             const SizedBox(height: 4),
-            Text(label, style: Theme.of(context).textTheme.bodySmall),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
           ],
         ),
       ),

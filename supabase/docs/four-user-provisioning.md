@@ -18,11 +18,14 @@ Provisioning is manual and uses the service role key. When a user signs in with 
 
 1. Collect the four email addresses. Decide each user's `display_name`.
 
-2. Run the provisioning script for each user (set `SERVICE_ROLE_KEY` first):
+2. Run the provisioning script for each of the 4 friends (using default password '123456' for fast initial setup):
 
    ```powershell
    $env:SERVICE_ROLE_KEY = "eyJ..."
-   node supabase/scripts/provision_user.js "person@example.com" "temporary-password" "DisplayName"
+   node supabase/scripts/provision_user.js "udefret12@gmail.com" "123456" "Freddy"
+   node supabase/scripts/provision_user.js "felipe@gmail.com" "123456" "Felipe"
+   node supabase/scripts/provision_user.js "cristiancarrillo262@gmail.com" "123456" "Cristian"
+   node supabase/scripts/provision_user.js "Samineiror123@gmail.com" "123456" "Samir"
    ```
 
    The script creates the `auth.users` row (email confirmed, no email verification required), then the matching `profiles` row with the same UUID, `platform=unknown`, `timezone=America/Santiago`, and the default targets.

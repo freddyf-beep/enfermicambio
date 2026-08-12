@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,7 +8,9 @@ import 'package:timezone/data/latest.dart' as timezone_data;
 import 'features/app/data/health_sync_bootstrap.dart';
 import 'features/app/presentation/app_shell.dart';
 import 'features/auth/presentation/auth_gate.dart';
+import 'features/notifications/data/notification_delivery_coordinator.dart';
 import 'shared/config/app_environment.dart';
+import 'shared/ui/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +23,7 @@ Future<void> main() async {
         url: AppEnvironment.supabaseUrl,
         publishableKey: AppEnvironment.supabaseAnonKey,
       );
+      unawaited(NotificationDeliveryCoordinator.ensure().start());
     } on Exception {
       // A backend failure must never blank the screen; the auth gate will
       // surface an offline/error state instead.
@@ -36,13 +41,9 @@ class EnfermicambioApp extends StatelessWidget {
     return MaterialApp(
       title: 'Enfermicambio',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xff176b87),
-          brightness: Brightness.light,
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
       home: AppEnvironment.isConfigured
           ? AuthGate(
               child: AppShell(onResume: HealthSyncBootstrap.syncOnResume),
@@ -67,13 +68,13 @@ class _SetupMissingScreen extends StatelessWidget {
               const Icon(Icons.settings_outlined, size: 56),
               const SizedBox(height: 16),
               Text(
-                'App configuration missing',
+                'Falta configuración de la app',
                 style: Theme.of(context).textTheme.titleLarge,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               const Text(
-                'Build with --dart-define=SUPABASE_URL=... and '
+                'Ejecuta con --dart-define=SUPABASE_URL=... y '
                 '--dart-define=SUPABASE_ANON_KEY=...',
                 textAlign: TextAlign.center,
               ),

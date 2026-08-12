@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:enfermicambio/features/ranking/domain/ranking_models.dart';
 import 'package:enfermicambio/features/ranking/presentation/ranking_tab.dart';
 import 'package:enfermicambio/shared/config/app_environment.dart';
 

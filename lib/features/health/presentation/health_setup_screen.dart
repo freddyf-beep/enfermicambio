@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
 import '../domain/health_models.dart';
@@ -57,11 +58,10 @@ class _HealthSetupScreenState extends State<HealthSetupScreen> {
       SnackBar(
         content: Text(
           granted
-              ? 'Health permissions granted.'
+              ? 'Permisos de salud concedidos exitosamente.'
               : healthUnavailable
-              ? 'The health service is not available on this device. '
-                    'Open Health Connect and try again.'
-              : 'Health permissions were not granted.',
+              ? 'El servicio de salud no está disponible en este dispositivo. Abre Health Connect o Apple Health e inténtalo de nuevo.'
+              : 'Los permisos de salud no fueron concedidos.',
         ),
       ),
     );
@@ -72,7 +72,7 @@ class _HealthSetupScreenState extends State<HealthSetupScreen> {
   Widget build(BuildContext context) {
     final snapshot = _snapshot;
     return Scaffold(
-      appBar: AppBar(title: const Text('Health settings')),
+      appBar: AppBar(title: const Text('Configuración de Salud')),
       body: snapshot == null
           ? AsyncStateView(
               status: _status ?? const AsyncViewStatus.loading(),
@@ -88,9 +88,7 @@ class _HealthSetupScreenState extends State<HealthSetupScreen> {
                   const _InfoCard(
                     icon: Icons.info_outline,
                     message:
-                        'The health service is not available on this device or '
-                        'simulator. On a real phone, open Health Connect or '
-                        'Apple Health, then return here.',
+                        'El servicio de salud no está disponible en este dispositivo o emulador. En un teléfono real, activa Health Connect (Android) o Apple Health (iOS) y regresa aquí.',
                   ),
                   const SizedBox(height: 16),
                 ],
@@ -106,14 +104,18 @@ class _HealthSetupScreenState extends State<HealthSetupScreen> {
                         )
                       : const Icon(Icons.health_and_safety_outlined),
                   label: Text(
-                    _requesting ? 'Requesting...' : 'Request all permissions',
+                    _requesting ? 'Solicitando...' : 'Solicitar todos los permisos',
+                  ),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Text(
-                  'Steps, active calories, distance, and exercise minutes are '
-                  'read automatically. Manual step entries never count.',
-                  style: Theme.of(context).textTheme.bodySmall,
+                  'Los pasos, calorías activas, distancia y minutos de ejercicio se leen automáticamente. Los registros manuales de pasos nunca cuentan.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -129,23 +131,22 @@ class _PlatformCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final healthy = snapshot.healthAvailable;
     return Card(
       child: ListTile(
         leading: Icon(
           healthy ? Icons.check_circle : Icons.error_outline,
-          color: healthy ? theme.colorScheme.primary : theme.colorScheme.error,
+          color: healthy ? AppColors.fitnessGreen : AppColors.streakOrange,
           size: 32,
         ),
         title: Text(
-          snapshot.platform == 'ios' ? 'Apple Health' : 'Health Connect',
+          snapshot.platform == 'ios' ? 'Apple Health (iOS)' : 'Health Connect (Android)',
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
           healthy
-              ? 'Available - ${snapshot.grantedTypes.length} of '
-                    '4 permission groups granted'
-              : 'Not available: ${snapshot.message ?? 'unknown reason'}',
+              ? 'Disponible - ${snapshot.grantedTypes.length} de 4 grupos de permisos concedidos'
+              : 'No disponible: ${snapshot.message ?? 'Razón desconocida'}',
         ),
       ),
     );
@@ -163,25 +164,24 @@ class _PermissionList extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Permissions', style: Theme.of(context).textTheme.titleMedium),
+        Text(
+          'Permisos de Salud',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 8),
         for (final setting in settings)
           Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
               leading: Icon(
-                setting.granted
-                    ? Icons.check_circle_outline
-                    : Icons.radio_button_unchecked,
-                color: setting.granted
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).colorScheme.outline,
+                setting.granted ? Icons.check_circle_outline : Icons.radio_button_unchecked,
+                color: setting.granted ? AppColors.fitnessGreen : Theme.of(context).colorScheme.outline,
               ),
-              title: Text(setting.title),
+              title: Text(setting.title, style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text(setting.description),
               trailing: setting.granted
-                  ? const Text('Granted')
-                  : (setting.supported ? const Text('Not granted') : null),
+                  ? const Text('Concedido', style: TextStyle(color: AppColors.fitnessGreen, fontWeight: FontWeight.bold))
+                  : (setting.supported ? const Text('No concedido') : null),
             ),
           ),
       ],
@@ -193,29 +193,29 @@ class _PermissionList extends StatelessWidget {
     return [
       HealthPermissionSetting(
         id: 'steps',
-        title: 'Steps',
-        description: 'Automatic step counting from your device.',
+        title: 'Pasos Automáticos',
+        description: 'Conteo continuo de pasos desde el sensor de tu dispositivo.',
         metric: HealthMetricType.steps,
         granted: granted.contains(HealthMetricType.steps),
       ),
       HealthPermissionSetting(
         id: 'active_calories',
-        title: 'Active calories',
-        description: 'Energy burned from movement and exercise.',
+        title: 'Calorías Activas',
+        description: 'Energía quemada por movimiento corporal y ejercicio.',
         metric: HealthMetricType.activeCalories,
         granted: granted.contains(HealthMetricType.activeCalories),
       ),
       HealthPermissionSetting(
         id: 'distance',
-        title: 'Distance',
-        description: 'Distance walked or run.',
+        title: 'Distancia Recorrida',
+        description: 'Distancia total caminada o corrida en el día.',
         metric: HealthMetricType.distance,
         granted: granted.contains(HealthMetricType.distance),
       ),
       HealthPermissionSetting(
         id: 'exercise_minutes',
-        title: 'Exercise minutes',
-        description: 'Minutes of active exercise.',
+        title: 'Minutos de Ejercicio',
+        description: 'Tiempo acumulado de entrenamiento activo.',
         metric: HealthMetricType.exerciseMinutes,
         granted: granted.contains(HealthMetricType.exerciseMinutes),
       ),
@@ -232,12 +232,12 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      color: AppColors.darkSurfaceVariant,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Icon(icon),
+            Icon(icon, color: AppColors.streakOrange),
             const SizedBox(width: 12),
             Expanded(child: Text(message)),
           ],

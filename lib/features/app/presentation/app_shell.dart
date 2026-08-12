@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/ui/app_tab_navigator.dart';
 import '../../activity/presentation/home_tab.dart';
 import '../../game/presentation/game_tab.dart';
 import '../../nutrition/presentation/register_tab.dart';
@@ -27,12 +28,22 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    AppTabNavigator.requests.addListener(_onTabRequest);
   }
 
   @override
   void dispose() {
+    AppTabNavigator.requests.removeListener(_onTabRequest);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  void _onTabRequest() {
+    final tab = AppTabNavigator.requests.value;
+    if (tab == null || !mounted || tab == _selectedIndex) return;
+    setState(() {
+      _selectedIndex = tab;
+    });
   }
 
   @override

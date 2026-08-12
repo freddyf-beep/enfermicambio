@@ -3,9 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Enfermicambio reads automatic step data to calculate private competition rankings.</string>
+	<string>Enfermicambio lee tus datos automáticos de salud (pasos, calorías, distancia y ejercicio) para calcular el ranking privado del grupo.</string>
 	<key>NSHealthUpdateUsageDescription</key>
-	<string>Enfermicambio does not write health data.</string>
+	<string>Enfermicambio no escribe datos en Apple Health.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Enfermicambio usa la cámara para escanear códigos de barras y registrar fotos de comida.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Enfermicambio accede a tus fotos para registrar comidas y compartirlas en el grupo.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Enfermicambio puede guardar fotos de comida en tu biblioteca cuando lo indiques.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Enfermicambio no graba audio; este permiso solo se declara si el sistema lo solicita al usar la cámara.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

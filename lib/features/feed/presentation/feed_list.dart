@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../../shared/ui/app_theme.dart';
 import '../domain/feed_models.dart';
 
 class FeedList extends StatelessWidget {
@@ -24,13 +25,31 @@ class FeedList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (posts.isEmpty) {
-      return const Center(
+      return Card(
         child: Padding(
-          padding: EdgeInsets.all(32),
-          child: Text('No posts yet. The shared timeline will appear here.'),
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            children: [
+              const Icon(Icons.forum_outlined, size: 48, color: AppColors.primaryLight),
+              const SizedBox(height: 12),
+              Text(
+                'No hay publicaciones aún',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Los eventos automáticos, logros, comidas y publicaciones de los 4 amigos aparecerán aquí.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
         ),
       );
     }
+
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -44,7 +63,7 @@ class FeedList extends StatelessWidget {
                   ? const CircularProgressIndicator()
                   : OutlinedButton(
                       onPressed: onLoadMore,
-                      child: const Text('Load older posts'),
+                      child: const Text('Cargar publicaciones anteriores'),
                     ),
             ),
           );
@@ -69,98 +88,141 @@ class _PostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final badgeColor = _typeColor(post.type);
+
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 6),
+      margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 CircleAvatar(
-                  radius: 16,
-                  backgroundColor: theme.colorScheme.primaryContainer,
+                  radius: 18,
+                  backgroundColor: AppColors.primaryLight.withOpacity(0.2),
                   child: Text(
-                    post.authorName.isEmpty
-                        ? '?'
-                        : post.authorName[0].toUpperCase(),
+                    post.authorName.isEmpty ? '?' : post.authorName[0].toUpperCase(),
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryLight),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(post.authorName, style: theme.textTheme.titleSmall),
+                      Row(
+                        children: [
+                          Text(post.authorName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          if (post.isSystem) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.trophyPurple.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'SISTEMA',
+                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.trophyPurple),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                       Text(
-                        DateFormat.MMMd().add_Hm().format(post.createdAt),
-                        style: theme.textTheme.bodySmall,
+                        DateFormat.MMMd('es').add_Hm().format(post.createdAt),
+                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
                       ),
                     ],
                   ),
                 ),
-                if (post.isSystem)
-                  Icon(
-                    Icons.auto_awesome,
-                    size: 16,
-                    color: theme.colorScheme.tertiary,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: badgeColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(6),
                   ),
+                  child: Text(
+                    _typeLabel(post.type),
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: badgeColor),
+                  ),
+                ),
               ],
             ),
             if (post.caption != null) ...[
-              const SizedBox(height: 8),
-              Text(post.caption!),
+              const SizedBox(height: 10),
+              Text(
+                post.caption!,
+                style: const TextStyle(fontSize: 14, height: 1.3),
+              ),
             ],
             if (post.mediaUrls.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               SizedBox(
-                height: 120,
+                height: 140,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemCount: post.mediaUrls.length,
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (context, index) => ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                     child: Image.network(
                       post.mediaUrls[index],
-                      width: 120,
+                      width: 140,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => const SizedBox(
-                        width: 120,
-                        child: Icon(Icons.broken_image_outlined),
+                      errorBuilder: (_, _, _) => Container(
+                        width: 140,
+                        color: AppColors.darkSurfaceVariant,
+                        child: const Icon(Icons.broken_image_outlined, color: AppColors.streakOrange),
                       ),
                     ),
                   ),
                 ),
               ),
             ],
-            const SizedBox(height: 8),
-            Text(
-              _typeLabel(post.type),
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.outline,
-              ),
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Row(
               children: [
                 if (onReact != null) ...[
-                  IconButton(
-                    onPressed: () => onReact!(post),
-                    icon: const Icon(Icons.favorite_outline),
-                    tooltip: 'React',
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => onReact!(post),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.favorite_border, size: 18, color: AppColors.streakOrange),
+                          const SizedBox(width: 4),
+                          Text(
+                            post.reactionCount > 0 ? '${post.reactionCount}' : 'Reaccionar',
+                            style: const TextStyle(fontSize: 12, color: AppColors.streakOrange),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  if (post.reactionCount > 0) Text('${post.reactionCount}'),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 12),
                 ],
                 if (onComment != null) ...[
-                  IconButton(
-                    onPressed: () => onComment!(post),
-                    icon: const Icon(Icons.comment_outlined),
-                    tooltip: 'Comment',
+                  InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () => onComment!(post),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.chat_bubble_outline, size: 18, color: AppColors.primaryLight),
+                          const SizedBox(width: 4),
+                          Text(
+                            post.commentCount > 0 ? '${post.commentCount}' : 'Comentar',
+                            style: const TextStyle(fontSize: 12, color: AppColors.primaryLight),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  if (post.commentCount > 0) Text('${post.commentCount}'),
                 ],
               ],
             ),
@@ -172,17 +234,33 @@ class _PostCard extends StatelessWidget {
 
   String _typeLabel(PostType type) {
     return switch (type) {
-      PostType.text => 'post',
-      PostType.photo => 'photo',
-      PostType.meal => 'meal',
-      PostType.workout => 'workout',
-      PostType.route => 'route',
-      PostType.achievement => 'achievement',
-      PostType.steps => 'step milestone',
-      PostType.rankingChange => 'ranking change',
-      PostType.roundResult => 'round result',
-      PostType.mission => 'mission',
-      PostType.season => 'season',
+      PostType.text => 'Publicación',
+      PostType.photo => 'Foto',
+      PostType.meal => 'Comida 🍽️',
+      PostType.workout => 'Entrenamiento 🏃',
+      PostType.route => 'Ruta 📍',
+      PostType.achievement => 'Logro 🏆',
+      PostType.steps => 'Hito de Pasos 👣',
+      PostType.rankingChange => 'Adelantamiento ⚡',
+      PostType.roundResult => 'Franja Horaria 🥇',
+      PostType.mission => 'Misión 🎯',
+      PostType.season => 'Temporada 👑',
+    };
+  }
+
+  Color _typeColor(PostType type) {
+    return switch (type) {
+      PostType.text => AppColors.primaryLight,
+      PostType.photo => AppColors.primaryLight,
+      PostType.meal => AppColors.macroCarbs,
+      PostType.workout => AppColors.fitnessGreen,
+      PostType.route => AppColors.fitnessGreen,
+      PostType.achievement => AppColors.trophyPurple,
+      PostType.steps => AppColors.primaryLight,
+      PostType.rankingChange => AppColors.streakOrange,
+      PostType.roundResult => AppColors.trophyPurple,
+      PostType.mission => AppColors.fitnessGreen,
+      PostType.season => AppColors.trophyPurple,
     };
   }
 }

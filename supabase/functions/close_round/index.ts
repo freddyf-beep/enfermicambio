@@ -163,6 +163,38 @@ async function handle(
     system_generated: true,
   });
 
+  // Notify all four users about the round result (idempotent per key).
+  const roundLabel =
+    round === "morning" ? "la mañana" : round === "afternoon" ? "la tarde" : "la noche";
+  const winnerName = winnerProfile?.display_name ?? "Alguien";
+  const notifKey = `round_result:${round}:${competitionDate}`;
+  const { data: allProfiles } = await supabaseAdmin
+    .from("profiles")
+    .select("id");
+  for (const p of allProfiles ?? []) {
+    const { data: dup } = await supabaseAdmin
+      .from("notifications")
+      .select("id")
+      .eq("user_id", p.id)
+      .eq("type", "round_result")
+      .eq("payload->>key", notifKey)
+      .limit(1);
+    if ((dup?.length ?? 0) > 0) continue;
+    const { error: notifErr } = await supabaseAdmin.rpc("insert_notification", {
+      p_user_id: p.id,
+      p_type: "round_result",
+      p_title: `${winnerName} ganó la ronda`,
+      p_body: `🏆 ${winnerName} ganó la ronda de ${roundLabel} con ${best.toLocaleString("es-CL")} pasos.`,
+      p_payload: {
+        key: notifKey,
+        round,
+        competition_date: competitionDate,
+        winner_id: winnerId,
+      },
+    });
+    if (notifErr) throw new Error(`round notify failed: ${notifErr.message}`);
+  }
+
   return Response.json({
     round,
     date: competitionDate,

@@ -5,14 +5,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app/data/dashboard_cache.dart';
+import '../../app/data/dashboard_repository.dart';
 import '../../app/data/offline_post_service.dart';
+import '../../app/presentation/notification_bell.dart';
 import '../../feed/domain/feed_models.dart';
 import '../../feed/presentation/feed_list.dart';
 import '../../health/domain/health_models.dart';
 import '../../ranking/domain/ranking_models.dart';
-import '../../../shared/ui/async_view_status.dart';
+import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
-import '../../app/data/dashboard_repository.dart';
+import '../../../shared/ui/async_view_status.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -62,7 +64,6 @@ class _HomeTabState extends State<HomeTab> {
       });
     }
     await _load();
-    // Replay any writes that were queued while offline.
     await _posts.flushPending();
     _subscribeRealtime();
   }
@@ -102,7 +103,7 @@ class _HomeTabState extends State<HomeTab> {
         _status = _data == null
             ? AsyncViewStatus.backendError(error.toString())
             : AsyncViewStatus.offline(
-                'Could not refresh. Showing the last saved data.',
+                'Sin conexión. Mostrando los últimos datos guardados.',
               );
       });
     }
@@ -117,7 +118,7 @@ class _HomeTabState extends State<HomeTab> {
     } on Exception {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not react. Try again.')),
+          const SnackBar(content: Text('No se pudo reaccionar. Intenta de nuevo.')),
         );
       }
     }
@@ -130,24 +131,24 @@ class _HomeTabState extends State<HomeTab> {
     final body = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Comment'),
+        title: const Text('Agregar Comentario'),
         content: TextField(
           controller: controller,
           maxLines: 3,
           maxLength: 1000,
           decoration: const InputDecoration(
-            hintText: 'Write a comment',
+            hintText: 'Escribe un comentario para tus amigos...',
             border: OutlineInputBorder(),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: const Text('Cancelar'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Send'),
+            child: const Text('Enviar'),
           ),
         ],
       ),
@@ -159,7 +160,7 @@ class _HomeTabState extends State<HomeTab> {
     } on Exception {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not comment. Try again.')),
+          const SnackBar(content: Text('No se pudo enviar el comentario. Intenta de nuevo.')),
         );
       }
     }
@@ -180,7 +181,17 @@ class _HomeTabState extends State<HomeTab> {
 
     final data = _data!;
     return Scaffold(
-      appBar: AppBar(title: const Text('HOY')),
+      appBar: AppBar(
+        title: const Text('HOY'),
+        actions: [
+          NotificationBell(),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _load,
+            tooltip: 'Actualizar',
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -188,48 +199,56 @@ class _HomeTabState extends State<HomeTab> {
           padding: const EdgeInsets.all(16),
           children: [
             if (_showingCache) ...[
-              Row(
-                children: [
-                  const Icon(Icons.cloud_off_outlined, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Showing cached data',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.outline,
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.darkSurfaceVariant,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.cloud_off_outlined, size: 18, color: AppColors.streakOrange),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Mostrando datos en caché',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
-                  ),
-                  TextButton(onPressed: _load, child: const Text('Retry')),
-                ],
+                    TextButton(
+                      onPressed: _load,
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
             ],
             if (_status?.state == AsyncState.offline) ...[
               Card(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                color: AppColors.streakOrange.withOpacity(0.15),
                 child: ListTile(
-                  leading: const Icon(Icons.wifi_off),
-                  title: const Text('You are offline'),
+                  leading: const Icon(Icons.wifi_off, color: AppColors.streakOrange),
+                  title: const Text('Estás sin conexión'),
                   subtitle: Text(_status!.message ?? ''),
                   trailing: TextButton(
                     onPressed: _load,
-                    child: const Text('Retry'),
+                    child: const Text('Reintentar'),
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
             ],
-            Text('Today', style: Theme.of(context).textTheme.titleLarge),
+            const _SectionHeader(title: 'Resumen de Hoy', icon: Icons.bolt),
             const SizedBox(height: 8),
             _SummaryCard(aggregate: data.me),
             const SizedBox(height: 24),
-            Text('Ranking', style: Theme.of(context).textTheme.titleLarge),
+            const _SectionHeader(title: 'Posiciones del Grupo', icon: Icons.leaderboard),
             const SizedBox(height: 8),
-            for (final row in data.ranking) _RankingRowTile(row: row),
+            for (final row in data.ranking) _RankingRowCard(row: row),
             const SizedBox(height: 24),
-            Text('Feed', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 4),
+            const _SectionHeader(title: 'Novedades del Feed', icon: Icons.dynamic_feed),
+            const SizedBox(height: 8),
             FeedList(
               posts: data.feedPage.posts,
               onReact: _react,
@@ -242,6 +261,30 @@ class _HomeTabState extends State<HomeTab> {
   }
 }
 
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, required this.icon});
+
+  final String title;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: AppColors.primaryLight),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.3,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.aggregate});
 
@@ -250,27 +293,77 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (aggregate == null) {
-      return const Card(
+      return Card(
         child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text('Connect a health source to see your daily summary.'),
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            children: [
+              const Icon(Icons.health_and_safety_outlined, size: 36, color: AppColors.primaryLight),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  'Conecta tu fuente de salud (Apple Health o Health Connect) para sincronizar tu día.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
+
+    final agg = aggregate!;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _Metric(label: 'Steps', value: aggregate!.dailySteps),
-            _Metric(label: 'Active kcal', value: aggregate!.activeCalories),
-            _Metric(
-              label: 'Distance',
-              value: aggregate!.distanceMeters,
-              unit: 'm',
+            Row(
+              children: [
+                Expanded(
+                  child: _MetricTile(
+                    icon: Icons.directions_walk,
+                    label: 'Pasos',
+                    value: agg.dailySteps,
+                    color: AppColors.primaryLight,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _MetricTile(
+                    icon: Icons.local_fire_department,
+                    label: 'Calorías Activas',
+                    value: agg.activeCalories,
+                    unit: 'kcal',
+                    color: AppColors.streakOrange,
+                  ),
+                ),
+              ],
             ),
-            _Metric(label: 'Exercise min', value: aggregate!.exerciseMinutes),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _MetricTile(
+                    icon: Icons.straighten,
+                    label: 'Distancia',
+                    value: (agg.distanceMeters / 1000).toStringAsFixed(1),
+                    unit: 'km',
+                    color: AppColors.fitnessGreen,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _MetricTile(
+                    icon: Icons.timer,
+                    label: 'Ejercicio',
+                    value: agg.exerciseMinutes,
+                    unit: 'min',
+                    color: AppColors.trophyPurple,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -278,68 +371,151 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _Metric extends StatelessWidget {
-  const _Metric({required this.label, required this.value, this.unit});
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.unit,
+    required this.color,
+  });
 
+  final IconData icon;
   final String label;
-  final num value;
+  final dynamic value;
   final String? unit;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final suffix = unit ?? '';
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label),
-          Text(
-            '${_format(value)} $suffix',
-            style: const TextStyle(fontWeight: FontWeight.w700),
+          Row(
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          RichText(
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: _formatValue(value),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                ),
+                if (unit != null)
+                  TextSpan(
+                    text: ' $unit',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  String _format(num value) {
-    if (value >= 1000) {
-      return '${(value / 1000).toStringAsFixed(1)}k';
+  String _formatValue(dynamic val) {
+    if (val is num) {
+      if (val >= 10000) {
+        return '${(val / 1000).toStringAsFixed(1)}k';
+      }
+      return val.toString();
     }
-    return value.toStringAsFixed(value % 1 == 0 ? 0 : 1);
+    return val.toString();
   }
 }
 
-class _RankingRowTile extends StatelessWidget {
-  const _RankingRowTile({required this.row});
+class _RankingRowCard extends StatelessWidget {
+  const _RankingRowCard({required this.row});
 
   final RankingRow row;
 
   @override
   Widget build(BuildContext context) {
-    final freshness = switch (row.freshness) {
-      UserFreshness.fresh => '',
-      UserFreshness.stale => ' (stale)',
-      UserFreshness.missing => ' (no data)',
-      UserFreshness.denied => ' (permission denied)',
-      UserFreshness.unavailable => ' (unavailable)',
+    final rankColor = switch (row.rank) {
+      1 => const Color(0xFFFFD700), // Oro
+      2 => const Color(0xFFC0C0C0), // Plata
+      3 => const Color(0xFFCD7F32), // Bronce
+      _ => AppColors.primaryLight,
     };
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: CircleAvatar(child: Text('${row.rank}')),
-      title: Text('${row.displayName}$freshness'),
-      trailing: Text(
-        _format(row.value),
-        style: const TextStyle(fontWeight: FontWeight.w700),
+
+    final freshnessText = switch (row.freshness) {
+      UserFreshness.fresh => 'Sincronizado',
+      UserFreshness.stale => 'Desactualizado',
+      UserFreshness.missing => 'Sin datos',
+      UserFreshness.denied => 'Permiso denegado',
+      UserFreshness.unavailable => 'No disponible',
+    };
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: rankColor.withOpacity(0.2),
+          child: Text(
+            '#${row.rank}',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: rankColor,
+            ),
+          ),
+        ),
+        title: Text(
+          row.displayName,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          freshnessText,
+          style: TextStyle(
+            fontSize: 12,
+            color: row.freshness == UserFreshness.fresh
+                ? AppColors.fitnessGreen
+                : Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+        trailing: Text(
+          '${_formatSteps(row.value)} pasos',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+            color: AppColors.primaryLight,
+          ),
+        ),
       ),
     );
   }
 
-  String _format(double value) {
-    if (value >= 1000) {
-      return '${(value / 1000).toStringAsFixed(1)}k';
+  String _formatSteps(double val) {
+    if (val >= 1000) {
+      return '${(val / 1000).toStringAsFixed(1)}k';
     }
-    return value.toStringAsFixed(0);
+    return val.toStringAsFixed(0);
   }
 }

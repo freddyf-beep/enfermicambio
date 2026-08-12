@@ -24,44 +24,44 @@ class AsyncStateView extends StatelessWidget {
       case AsyncState.empty:
         return _Message(
           icon: Icons.inbox_outlined,
-          title: 'Nothing here yet',
-          message: status.message ?? 'There is no data to show.',
+          title: 'Sin datos aún',
+          message: status.message ?? 'No hay datos para mostrar en este momento.',
           onRetry: onRetry,
         );
       case AsyncState.offline:
         return _Message(
           icon: Icons.cloud_off_outlined,
-          title: 'You are offline',
-          message: status.message ?? 'Showing the last saved data.',
+          title: 'Sin conexión',
+          message: status.message ?? 'Mostrando los últimos datos guardados.',
           onRetry: onRetry,
         );
       case AsyncState.permissionDenied:
         return _Message(
           icon: Icons.lock_outline,
-          title: 'Permission needed',
-          message: status.message ?? 'Allow access to see this content.',
+          title: 'Permiso requerido',
+          message: status.message ?? 'Concede el acceso para ver este contenido.',
           onRetry: onRetry,
         );
       case AsyncState.backendError:
         return _Message(
           icon: Icons.cloud_off_outlined,
-          title: 'Something went wrong',
+          title: 'Error de servidor',
           message:
-              status.message ?? 'We could not reach the server. Try again.',
+              status.message ?? 'No se pudo conectar con el servidor. Inténtalo de nuevo.',
           onRetry: onRetry,
         );
       case AsyncState.stale:
         return _Message(
           icon: Icons.schedule,
-          title: 'Data may be out of date',
-          message: status.message ?? 'The last sync was a while ago.',
+          title: 'Datos desactualizados',
+          message: status.message ?? 'La última sincronización fue hace un tiempo.',
           onRetry: onRetry,
         );
       case AsyncState.retryableFailure:
         return _Message(
           icon: Icons.refresh,
-          title: 'Could not load',
-          message: status.message ?? 'Please try again.',
+          title: 'No se pudo cargar',
+          message: status.message ?? 'Por favor intenta nuevamente.',
           onRetry: onRetry,
         );
     }
@@ -107,7 +107,7 @@ class _Message extends StatelessWidget {
               const SizedBox(height: 16),
               FilledButton.tonal(
                 onPressed: onRetry,
-                child: const Text('Try again'),
+                child: const Text('Reintentar'),
               ),
             ],
           ],

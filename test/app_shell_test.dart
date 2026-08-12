@@ -87,7 +87,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Permission needed'), findsOneWidget);
+    expect(find.text('Permiso requerido'), findsOneWidget);
     expect(find.byIcon(Icons.lock_outline), findsOneWidget);
   });
 }
