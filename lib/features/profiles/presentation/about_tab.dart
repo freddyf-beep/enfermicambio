@@ -86,7 +86,7 @@ class _AboutTabState extends State<AboutTab> {
         title: const Text('NOSOTROS'),
         actions: [
           IconButton(
-            tooltip: 'Configuración de Salud',
+            tooltip: 'Permisos y Salud',
             icon: const Icon(
               Icons.health_and_safety_outlined,
               color: AppColors.primaryLight,

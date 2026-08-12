@@ -1,8 +1,8 @@
 name: build-ipa
 
-# Builds an unsigned IPA for sideloading with Sideloadly/AltStore using a free
-# Apple ID (7-day validity, no paid developer account required). Matches the
-# proven flow in the server-dashboard-ios project.
+# Builds an IPA for sideloading with Sideloadly/AltStore using a free Apple ID
+# (7-day validity, no paid developer account required). The cloud build is
+# ad-hoc signed so HealthKit remains declared for the final device re-sign.
 #
 # No repository secrets required.
 
@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-ipa:
-    name: Build unsigned IPA for sideloading
+    name: Build HealthKit-ready IPA for sideloading
     runs-on: macos-latest
     timeout-minutes: 45
     steps:
@@ -31,7 +31,7 @@ jobs:
         run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
         shell: pwsh
 
-      - name: Build iOS app (device, unsigned)
+      - name: Build iOS app (device, cloud unsigned)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -42,7 +42,7 @@ jobs:
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
 
-      - name: Package unsigned IPA
+      - name: Sign entitlements and package IPA
         run: |
           APP_PATH=$(find build/ios/iphoneos -name "*.app" -maxdepth 2 | head -1)
           if [ -z "$APP_PATH" ]; then
@@ -80,8 +80,19 @@ jobs:
           cp "/tmp/${EXEC_NAME}_device" "$EXEC_PATH"
           chmod +x "$EXEC_PATH"
 
-          # Remove signing artifacts so Sideloadly signs cleanly.
-          rm -rf "$APP_PATH/_CodeSignature"
+          # Embed the requested HealthKit entitlement in an ad-hoc signature.
+          # Sideloading tools can then read and request the same entitlement
+          # when they create the device provisioning profile.
+          codesign --force --deep --sign - \
+            --entitlements "$GITHUB_WORKSPACE/ios/Runner/Runner.entitlements" \
+            --generate-entitlement-der \
+            "$APP_PATH"
+          echo "=== Entitlements declared by the app ==="
+          codesign --display --entitlements :- "$APP_PATH" 2>&1 | tee /tmp/runner-entitlements.plist
+          grep -q "com.apple.developer.healthkit" /tmp/runner-entitlements.plist
+
+          # A device provisioning profile is still supplied by Sideloadly or
+          # AltStore. Never retain a stale profile from the cloud runner.
           rm -f "$APP_PATH/embedded.mobileprovision"
 
           # Ensure the required Info.plist keys are present for sideloading.

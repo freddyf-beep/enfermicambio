@@ -9,7 +9,14 @@ enum HealthReadStatus {
   retryableFailure,
 }
 
-enum HealthMetricType { steps, activeCalories, distance, exerciseMinutes }
+enum HealthMetricType {
+  steps,
+  activeCalories,
+  distance,
+  exerciseMinutes,
+  workouts,
+  workoutRoutes,
+}
 
 /// The state the setup UI can honestly communicate across HealthKit and
 /// Health Connect. iOS deliberately keeps read permission status private, so

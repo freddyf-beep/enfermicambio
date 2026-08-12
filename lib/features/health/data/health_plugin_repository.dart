@@ -18,16 +18,25 @@ class HealthPluginRepository implements HealthRepository {
   final Duration permissionTimeout;
   bool _configured = false;
   bool _authorizationRequested = false;
+  String? _lastAuthorizationError;
   HealthReadStatus? _lastReadStatus;
 
-  static const _readTypes = <HealthDataType>[
+  static const _dailyReadTypes = <HealthDataType>[
     HealthDataType.STEPS,
     HealthDataType.ACTIVE_ENERGY_BURNED,
     HealthDataType.DISTANCE_WALKING_RUNNING,
     HealthDataType.EXERCISE_TIME,
   ];
 
-  static const _readPermissions = <HealthDataAccess>[
+  static const _authorizationTypes = <HealthDataType>[
+    ..._dailyReadTypes,
+    HealthDataType.WORKOUT,
+    HealthDataType.WORKOUT_ROUTE,
+  ];
+
+  static const _authorizationPermissions = <HealthDataAccess>[
+    HealthDataAccess.READ,
+    HealthDataAccess.READ,
     HealthDataAccess.READ,
     HealthDataAccess.READ,
     HealthDataAccess.READ,
@@ -36,8 +45,8 @@ class HealthPluginRepository implements HealthRepository {
 
   @override
   Future<bool> requestStepReadPermission() => _requestPermissions(
-    _readTypes.sublist(0, 1),
-    _readPermissions.sublist(0, 1),
+    _dailyReadTypes.sublist(0, 1),
+    _authorizationPermissions.sublist(0, 1),
   );
 
   @override
@@ -63,7 +72,10 @@ class HealthPluginRepository implements HealthRepository {
           );
         }
         final hasPermissions = await _health
-            .hasPermissions(_readTypes, permissions: _readPermissions)
+            .hasPermissions(
+              _dailyReadTypes,
+              permissions: _authorizationPermissions.sublist(0, 4),
+            )
             .timeout(permissionTimeout);
         if (hasPermissions == false) {
           return _rememberRead(
@@ -88,7 +100,7 @@ class HealthPluginRepository implements HealthRepository {
       );
       final points = await _health
           .getHealthDataFromTypes(
-            types: _readTypes,
+            types: _dailyReadTypes,
             startTime: localStart,
             endTime: localNow,
           )
@@ -159,7 +171,7 @@ class HealthPluginRepository implements HealthRepository {
         }
 
         final granted = <HealthMetricType>{};
-        for (final type in _readTypes) {
+        for (final type in _authorizationTypes) {
           final has = await _health
               .hasPermissions([type], permissions: [HealthDataAccess.READ])
               .timeout(permissionTimeout);
@@ -183,6 +195,7 @@ class HealthPluginRepository implements HealthRepository {
         HealthReadStatus.noData => HealthSetupState.noData,
         HealthReadStatus.sourceUnavailable => HealthSetupState.unavailable,
         HealthReadStatus.retryableFailure => HealthSetupState.retryable,
+        _ when _lastAuthorizationError != null => HealthSetupState.retryable,
         _ when _authorizationRequested => HealthSetupState.requested,
         _ => HealthSetupState.available,
       };
@@ -191,9 +204,11 @@ class HealthPluginRepository implements HealthRepository {
         healthAvailable: state != HealthSetupState.unavailable,
         grantedTypes: const {},
         state: state,
-        message: state == HealthSetupState.requested
-            ? 'Apple Health protege el detalle de los permisos de lectura. Verificaremos el acceso con una lectura real.'
-            : null,
+        message:
+            _lastAuthorizationError ??
+            (state == HealthSetupState.requested
+                ? 'Apple Health protege el detalle de los permisos de lectura. Verificaremos el acceso con una lectura real.'
+                : null),
       );
     } on TimeoutException catch (error) {
       return HealthSetupSnapshot(
@@ -216,13 +231,14 @@ class HealthPluginRepository implements HealthRepository {
 
   @override
   Future<bool> requestAllPermissions() =>
-      _requestPermissions(_readTypes, _readPermissions);
+      _requestPermissions(_authorizationTypes, _authorizationPermissions);
 
   Future<bool> _requestPermissions(
     List<HealthDataType> types,
     List<HealthDataAccess> permissions,
   ) async {
     try {
+      _lastAuthorizationError = null;
       await _configure();
       if (Platform.isAndroid) {
         final activityStatus = await Permission.activityRecognition.request();
@@ -241,11 +257,18 @@ class HealthPluginRepository implements HealthRepository {
           .timeout(permissionTimeout);
       if (requested) {
         _authorizationRequested = true;
+      } else if (Platform.isIOS) {
+        _lastAuthorizationError =
+            'Apple Health no abrió o no completó la autorización. Si ya la rechazaste, revisa Salud > tu perfil > Apps > Enfermicambio.';
       }
       return requested;
     } on TimeoutException {
+      _lastAuthorizationError =
+          'Apple Health tardó demasiado en responder a la autorización.';
       return false;
     } on Exception catch (error) {
+      _lastAuthorizationError =
+          'No se pudo solicitar Apple Health. La firma instalada debe incluir el permiso HealthKit. Detalle: $error';
       debugPrint('Health permission request failed: $error');
       return false;
     }
@@ -258,7 +281,8 @@ class HealthPluginRepository implements HealthRepository {
       HealthReadStatus.sourceUnavailable => HealthSetupState.unavailable,
       HealthReadStatus.retryableFailure => HealthSetupState.retryable,
       _ when granted.isEmpty => HealthSetupState.notGranted,
-      _ when granted.length < _readTypes.length => HealthSetupState.partial,
+      _ when granted.length < _authorizationTypes.length =>
+        HealthSetupState.partial,
       _ => HealthSetupState.available,
     };
   }
@@ -289,6 +313,8 @@ class HealthPluginRepository implements HealthRepository {
       HealthDataType.ACTIVE_ENERGY_BURNED => HealthMetricType.activeCalories,
       HealthDataType.DISTANCE_WALKING_RUNNING => HealthMetricType.distance,
       HealthDataType.EXERCISE_TIME => HealthMetricType.exerciseMinutes,
+      HealthDataType.WORKOUT => HealthMetricType.workouts,
+      HealthDataType.WORKOUT_ROUTE => HealthMetricType.workoutRoutes,
       _ => HealthMetricType.steps,
     };
   }

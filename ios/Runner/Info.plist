@@ -3,9 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Enfermicambio lee tus datos automáticos de salud (pasos, calorías, distancia y ejercicio) para calcular el ranking privado del grupo.</string>
+	<string>Enfermicambio lee pasos, calorías, distancia, entrenamientos y rutas para mostrar tu actividad y calcular el ranking privado.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Enfermicambio no escribe datos en Apple Health.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Enfermicambio usa movimiento y actividad física para detectar y validar tu entrenamiento.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Enfermicambio usa tu ubicación precisa mientras entrenas para registrar y mostrar la ruta recorrida.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Enfermicambio usa Bluetooth para encontrar y conectar sensores deportivos, como pulsómetros y accesorios de actividad.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Enfermicambio usa la cámara para escanear códigos de barras y registrar fotos de comida.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
@@ -36,6 +42,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

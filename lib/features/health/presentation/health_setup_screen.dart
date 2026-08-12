@@ -4,17 +4,21 @@ import '../../../shared/config/app_environment.dart';
 import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
+import '../../permissions/data/permission_handler_device_permission_repository.dart';
+import '../../permissions/domain/device_permission_models.dart';
 import '../domain/health_models.dart';
 import '../domain/health_setup_models.dart';
 
 class HealthSetupScreen extends StatefulWidget {
   const HealthSetupScreen({
     required this.repository,
+    this.devicePermissionRepository,
     this.onConnectionVerified,
     super.key,
   });
 
   final HealthRepository repository;
+  final DevicePermissionRepository? devicePermissionRepository;
   final Future<void> Function()? onConnectionVerified;
 
   @override
@@ -24,12 +28,18 @@ class HealthSetupScreen extends StatefulWidget {
 class _HealthSetupScreenState extends State<HealthSetupScreen>
     with WidgetsBindingObserver {
   HealthSetupSnapshot? _snapshot;
+  late final DevicePermissionRepository _devicePermissions;
+  List<DevicePermissionSnapshot> _deviceSnapshots = const [];
   AsyncViewStatus? _status;
   bool _requesting = false;
+  DevicePermissionKind? _requestingDevicePermission;
 
   @override
   void initState() {
     super.initState();
+    _devicePermissions =
+        widget.devicePermissionRepository ??
+        const PermissionHandlerDevicePermissionRepository();
     WidgetsBinding.instance.addObserver(this);
     _refresh();
   }
@@ -54,10 +64,14 @@ class _HealthSetupScreenState extends State<HealthSetupScreen>
       });
     }
     try {
-      final snapshot = await widget.repository.readSetupStatus();
+      final results = await Future.wait<Object>([
+        widget.repository.readSetupStatus(),
+        _devicePermissions.readAll(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _snapshot = snapshot;
+        _snapshot = results[0] as HealthSetupSnapshot;
+        _deviceSnapshots = results[1] as List<DevicePermissionSnapshot>;
       });
     } on Exception catch (error) {
       if (!mounted) return;
@@ -65,6 +79,58 @@ class _HealthSetupScreenState extends State<HealthSetupScreen>
         _status = AsyncViewStatus.backendError(error.toString());
       });
     }
+  }
+
+  Future<void> _requestDevicePermission(DevicePermissionKind kind) async {
+    setState(() {
+      _requestingDevicePermission = kind;
+    });
+    final result = await _devicePermissions.request(kind);
+    if (!mounted) return;
+    setState(() {
+      _requestingDevicePermission = null;
+      _replaceDeviceSnapshot(result);
+    });
+    if (result.requiresSettings && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.serviceEnabled
+                ? 'Este permiso está bloqueado. Ábrelo manualmente en Ajustes.'
+                : 'El servicio está desactivado en el teléfono. Actívalo en Ajustes.',
+          ),
+          action: SnackBarAction(
+            label: 'Ajustes',
+            onPressed: _devicePermissions.openSettings,
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _requestTrainingPermissions() async {
+    for (final kind in DevicePermissionKind.values) {
+      final current = _snapshotFor(kind);
+      if (current?.isGranted == true) continue;
+      await _requestDevicePermission(kind);
+      if (!mounted) return;
+    }
+    await _refresh();
+  }
+
+  void _replaceDeviceSnapshot(DevicePermissionSnapshot result) {
+    _deviceSnapshots = [
+      for (final snapshot in _deviceSnapshots)
+        if (snapshot.kind != result.kind) snapshot,
+      result,
+    ];
+  }
+
+  DevicePermissionSnapshot? _snapshotFor(DevicePermissionKind kind) {
+    for (final snapshot in _deviceSnapshots) {
+      if (snapshot.kind == kind) return snapshot;
+    }
+    return null;
   }
 
   Future<void> _requestAll() async {
@@ -177,7 +243,7 @@ class _HealthSetupScreenState extends State<HealthSetupScreen>
   Widget build(BuildContext context) {
     final snapshot = _snapshot;
     return Scaffold(
-      appBar: AppBar(title: const Text('Configuración de Salud')),
+      appBar: AppBar(title: const Text('Permisos y Salud')),
       body: snapshot == null
           ? AsyncStateView(
               status: _status ?? const AsyncViewStatus.loading(),
@@ -230,7 +296,33 @@ class _HealthSetupScreenState extends State<HealthSetupScreen>
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Solo leemos pasos, calorías activas, distancia y minutos de ejercicio. Los registros manuales de pasos nunca cuentan.',
+                  'Leemos pasos, calorías activas, distancia, minutos de ejercicio, entrenamientos y sus rutas. Los pasos ingresados manualmente nunca cuentan.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                _DevicePermissionsSection(
+                  snapshots: _deviceSnapshots,
+                  requesting: _requestingDevicePermission,
+                  onRequest: _requestDevicePermission,
+                  onOpenSettings: _devicePermissions.openSettings,
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _requestingDevicePermission == null
+                      ? _requestTrainingPermissions
+                      : null,
+                  icon: const Icon(Icons.verified_user_outlined),
+                  label: const Text('Activar permisos de entrenamiento'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'iOS siempre muestra sus propios avisos: debes elegir Permitir en cada uno. Si antes elegiste No permitir, usa el botón Ajustes.',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -288,7 +380,7 @@ class _PlatformCard extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          '${_labelFor(snapshot.state)}${snapshot.platform == 'android' && snapshot.healthAvailable ? ' · ${snapshot.grantedTypes.length} de 4 grupos' : ''}',
+          '${_labelFor(snapshot.state)}${snapshot.platform == 'android' && snapshot.healthAvailable ? ' · ${snapshot.grantedTypes.length} de 6 grupos' : ''}',
         ),
       ),
     );
@@ -394,6 +486,26 @@ class _PermissionList extends StatelessWidget {
             : granted.contains(HealthMetricType.exerciseMinutes),
         supported: snapshot.healthAvailable,
       ),
+      HealthPermissionSetting(
+        id: 'workouts',
+        title: 'Entrenamientos',
+        description: 'Carreras, caminatas, ciclismo y otras sesiones.',
+        metric: HealthMetricType.workouts,
+        granted: iOSReadStateIsPrivate
+            ? null
+            : granted.contains(HealthMetricType.workouts),
+        supported: snapshot.healthAvailable,
+      ),
+      HealthPermissionSetting(
+        id: 'workout_routes',
+        title: 'Rutas de entrenamiento',
+        description: 'Recorridos GPS asociados a tus entrenamientos.',
+        metric: HealthMetricType.workoutRoutes,
+        granted: iOSReadStateIsPrivate
+            ? null
+            : granted.contains(HealthMetricType.workoutRoutes),
+        supported: snapshot.healthAvailable,
+      ),
     ];
   }
 
@@ -417,6 +529,153 @@ class _PermissionList extends StatelessWidget {
     return 'Apple protege este estado';
   }
 }
+
+class _DevicePermissionsSection extends StatelessWidget {
+  const _DevicePermissionsSection({
+    required this.snapshots,
+    required this.requesting,
+    required this.onRequest,
+    required this.onOpenSettings,
+  });
+
+  final List<DevicePermissionSnapshot> snapshots;
+  final DevicePermissionKind? requesting;
+  final Future<void> Function(DevicePermissionKind kind) onRequest;
+  final Future<bool> Function() onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Permisos del entrenamiento',
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Necesarios para medir actividad, registrar rutas, conectar sensores y avisarte.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 8),
+        for (final kind in DevicePermissionKind.values)
+          _DevicePermissionTile(
+            snapshot: _findSnapshot(kind),
+            kind: kind,
+            requesting: requesting == kind,
+            onRequest: () => onRequest(kind),
+            onOpenSettings: onOpenSettings,
+          ),
+      ],
+    );
+  }
+
+  DevicePermissionSnapshot? _findSnapshot(DevicePermissionKind kind) {
+    for (final snapshot in snapshots) {
+      if (snapshot.kind == kind) return snapshot;
+    }
+    return null;
+  }
+}
+
+class _DevicePermissionTile extends StatelessWidget {
+  const _DevicePermissionTile({
+    required this.snapshot,
+    required this.kind,
+    required this.requesting,
+    required this.onRequest,
+    required this.onOpenSettings,
+  });
+
+  final DevicePermissionSnapshot? snapshot;
+  final DevicePermissionKind kind;
+  final bool requesting;
+  final VoidCallback onRequest;
+  final Future<bool> Function() onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final granted = snapshot?.isGranted == true;
+    final needsSettings = snapshot?.requiresSettings == true;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Icon(
+          granted ? Icons.check_circle : _iconForDevicePermission(kind),
+          color: granted
+              ? AppColors.fitnessGreen
+              : Theme.of(context).colorScheme.outline,
+        ),
+        title: Text(
+          _titleForDevicePermission(kind),
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(_descriptionForDevicePermission(kind, snapshot)),
+        trailing: requesting
+            ? const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : granted
+            ? const Text(
+                'Concedido',
+                style: TextStyle(
+                  color: AppColors.fitnessGreen,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              )
+            : TextButton(
+                onPressed: needsSettings ? onOpenSettings : onRequest,
+                child: Text(needsSettings ? 'Ajustes' : 'Activar'),
+              ),
+      ),
+    );
+  }
+}
+
+String _titleForDevicePermission(DevicePermissionKind kind) => switch (kind) {
+  DevicePermissionKind.motion => 'Movimiento y actividad física',
+  DevicePermissionKind.location => 'Ubicación precisa',
+  DevicePermissionKind.bluetooth => 'Bluetooth y sensores',
+  DevicePermissionKind.notifications => 'Notificaciones',
+};
+
+String _descriptionForDevicePermission(
+  DevicePermissionKind kind,
+  DevicePermissionSnapshot? snapshot,
+) {
+  if (snapshot?.serviceEnabled == false) {
+    return 'El servicio está apagado en el teléfono.';
+  }
+  if (snapshot?.state == DevicePermissionState.permanentlyDenied) {
+    return 'Bloqueado por el sistema; actívalo desde Ajustes.';
+  }
+  if (snapshot?.state == DevicePermissionState.restricted) {
+    return 'Restringido por controles del dispositivo.';
+  }
+  if (snapshot?.message != null) return snapshot!.message!;
+  return switch (kind) {
+    DevicePermissionKind.motion =>
+      'Detecta movimiento, pasos y cambios de actividad.',
+    DevicePermissionKind.location =>
+      'Registra el recorrido GPS mientras entrenas.',
+    DevicePermissionKind.bluetooth =>
+      'Permite conectar pulsómetros y accesorios cercanos.',
+    DevicePermissionKind.notifications =>
+      'Muestra avisos de actividad, logros y competencia.',
+  };
+}
+
+IconData _iconForDevicePermission(DevicePermissionKind kind) => switch (kind) {
+  DevicePermissionKind.motion => Icons.directions_run,
+  DevicePermissionKind.location => Icons.location_on_outlined,
+  DevicePermissionKind.bluetooth => Icons.bluetooth,
+  DevicePermissionKind.notifications => Icons.notifications_outlined,
+};
 
 class _InfoCard extends StatelessWidget {
   const _InfoCard({required this.icon, required this.message});
