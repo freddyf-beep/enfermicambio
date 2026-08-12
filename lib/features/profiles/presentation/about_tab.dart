@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
+import '../../app/data/health_sync_bootstrap.dart';
 import '../../health/data/health_plugin_repository.dart';
 import '../../health/presentation/health_setup_screen.dart';
 import '../../notifications/data/supabase_notification_repository.dart';
@@ -86,11 +87,19 @@ class _AboutTabState extends State<AboutTab> {
         actions: [
           IconButton(
             tooltip: 'Configuración de Salud',
-            icon: const Icon(Icons.health_and_safety_outlined, color: AppColors.primaryLight),
+            icon: const Icon(
+              Icons.health_and_safety_outlined,
+              color: AppColors.primaryLight,
+            ),
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => HealthSetupScreen(repository: HealthPluginRepository()),
+                  builder: (_) => HealthSetupScreen(
+                    repository: HealthPluginRepository(),
+                    onConnectionVerified: () async {
+                      await HealthSyncBootstrap.syncNow();
+                    },
+                  ),
                 ),
               );
             },
@@ -127,9 +136,7 @@ class _AboutTabState extends State<AboutTab> {
                   'Registrar y ver mi peso',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                subtitle: const Text(
-                  'Solo tú ves esta información.',
-                ),
+                subtitle: const Text('Solo tú ves esta información.'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.of(context).push(
@@ -146,7 +153,10 @@ class _AboutTabState extends State<AboutTab> {
             const SizedBox(height: 8),
             const _NotificationPreferencesSection(),
             const SizedBox(height: 24),
-            const _SectionHeader(title: 'Entrenamientos Recientes', icon: Icons.fitness_center),
+            const _SectionHeader(
+              title: 'Entrenamientos Recientes',
+              icon: Icons.fitness_center,
+            ),
             const SizedBox(height: 8),
             if (_recentWorkouts == null || _recentWorkouts!.isEmpty)
               Card(
@@ -154,7 +164,10 @@ class _AboutTabState extends State<AboutTab> {
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      const Icon(Icons.info_outline, color: AppColors.primaryLight),
+                      const Icon(
+                        Icons.info_outline,
+                        color: AppColors.primaryLight,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
@@ -177,9 +190,15 @@ class _AboutTabState extends State<AboutTab> {
                         color: AppColors.fitnessGreen.withOpacity(0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(_workoutIcon(workout.workoutType), color: AppColors.fitnessGreen),
+                      child: Icon(
+                        _workoutIcon(workout.workoutType),
+                        color: AppColors.fitnessGreen,
+                      ),
                     ),
-                    title: Text(_workoutType(workout.workoutType), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Text(
+                      _workoutType(workout.workoutType),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     subtitle: Text(
                       '${workout.startedAt.day}/${workout.startedAt.month} ${workout.startedAt.hour}:${workout.startedAt.minute.toString().padLeft(2, '0')} - ${((workout.distanceMeters ?? 0) / 1000).toStringAsFixed(1)} km',
                     ),
@@ -187,7 +206,8 @@ class _AboutTabState extends State<AboutTab> {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => WorkoutDetailScreen(workoutId: workout.id),
+                          builder: (_) =>
+                              WorkoutDetailScreen(workoutId: workout.id),
                         ),
                       );
                     },
@@ -232,9 +252,9 @@ class _SectionHeader extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
         ),
       ],
     );
@@ -334,7 +354,9 @@ class _ProfileTile extends StatelessWidget {
               radius: 28,
               backgroundColor: AppColors.primaryLight.withOpacity(0.2),
               child: Text(
-                profile.displayName.isEmpty ? '?' : profile.displayName[0].toUpperCase(),
+                profile.displayName.isEmpty
+                    ? '?'
+                    : profile.displayName[0].toUpperCase(),
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -349,7 +371,10 @@ class _ProfileTile extends StatelessWidget {
                 children: [
                   Text(
                     profile.displayName,
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(

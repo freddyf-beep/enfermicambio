@@ -23,8 +23,7 @@ class HealthSyncService {
       now: currentTime,
       competitionTimezone: _config.competitionTimezone,
     );
-    if (read.status != HealthReadStatus.success &&
-        read.status != HealthReadStatus.noData) {
+    if (read.status != HealthReadStatus.success) {
       return HealthSyncResult(
         readStatus: read.status,
         aggregate: null,

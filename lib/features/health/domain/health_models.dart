@@ -11,6 +11,21 @@ enum HealthReadStatus {
 
 enum HealthMetricType { steps, activeCalories, distance, exerciseMinutes }
 
+/// The state the setup UI can honestly communicate across HealthKit and
+/// Health Connect. iOS deliberately keeps read permission status private, so
+/// a requested iOS permission is verified by attempting a real read instead of
+/// being rendered as denied.
+enum HealthSetupState {
+  available,
+  unavailable,
+  notGranted,
+  partial,
+  requested,
+  connected,
+  noData,
+  retryable,
+}
+
 class HealthSample {
   const HealthSample({
     required this.type,
@@ -140,12 +155,18 @@ class HealthSetupSnapshot {
     required this.healthAvailable,
     required this.grantedTypes,
     required this.message,
-  });
+    HealthSetupState? state,
+  }) : state =
+           state ??
+           (healthAvailable
+               ? HealthSetupState.available
+               : HealthSetupState.unavailable);
 
   final String platform;
   final bool healthAvailable;
   final Set<HealthMetricType> grantedTypes;
   final String? message;
+  final HealthSetupState state;
 }
 
 abstract interface class DailyActivitySink {

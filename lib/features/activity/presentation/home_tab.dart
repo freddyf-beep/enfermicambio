@@ -6,11 +6,15 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app/data/dashboard_cache.dart';
 import '../../app/data/dashboard_repository.dart';
+import '../../app/data/health_sync_bootstrap.dart';
 import '../../app/data/offline_post_service.dart';
 import '../../app/presentation/notification_bell.dart';
 import '../../feed/domain/feed_models.dart';
 import '../../feed/presentation/feed_list.dart';
+import '../../health/data/health_plugin_repository.dart';
 import '../../health/domain/health_models.dart';
+import '../../health/presentation/health_connection_card.dart';
+import '../../health/presentation/health_setup_screen.dart';
 import '../../ranking/domain/ranking_models.dart';
 import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
@@ -118,7 +122,9 @@ class _HomeTabState extends State<HomeTab> {
     } on Exception {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo reaccionar. Intenta de nuevo.')),
+          const SnackBar(
+            content: Text('No se pudo reaccionar. Intenta de nuevo.'),
+          ),
         );
       }
     }
@@ -160,9 +166,27 @@ class _HomeTabState extends State<HomeTab> {
     } on Exception {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo enviar el comentario. Intenta de nuevo.')),
+          const SnackBar(
+            content: Text('No se pudo enviar el comentario. Intenta de nuevo.'),
+          ),
         );
       }
+    }
+  }
+
+  Future<void> _openHealthSetup() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => HealthSetupScreen(
+          repository: HealthPluginRepository(),
+          onConnectionVerified: () async {
+            await HealthSyncBootstrap.syncNow();
+          },
+        ),
+      ),
+    );
+    if (mounted) {
+      await _load();
     }
   }
 
@@ -200,14 +224,21 @@ class _HomeTabState extends State<HomeTab> {
           children: [
             if (_showingCache) ...[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: AppColors.darkSurfaceVariant,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.cloud_off_outlined, size: 18, color: AppColors.streakOrange),
+                    const Icon(
+                      Icons.cloud_off_outlined,
+                      size: 18,
+                      color: AppColors.streakOrange,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -228,7 +259,10 @@ class _HomeTabState extends State<HomeTab> {
               Card(
                 color: AppColors.streakOrange.withOpacity(0.15),
                 child: ListTile(
-                  leading: const Icon(Icons.wifi_off, color: AppColors.streakOrange),
+                  leading: const Icon(
+                    Icons.wifi_off,
+                    color: AppColors.streakOrange,
+                  ),
                   title: const Text('Estás sin conexión'),
                   subtitle: Text(_status!.message ?? ''),
                   trailing: TextButton(
@@ -241,13 +275,26 @@ class _HomeTabState extends State<HomeTab> {
             ],
             const _SectionHeader(title: 'Resumen de Hoy', icon: Icons.bolt),
             const SizedBox(height: 8),
-            _SummaryCard(aggregate: data.me),
+            _SummaryCard(
+              aggregate: data.me,
+              needsHealthConnection:
+                  data.me == null ||
+                  data.me!.sourcePlatform == 'unknown' ||
+                  data.me!.syncedAt.millisecondsSinceEpoch == 0,
+              onConnectHealth: _openHealthSetup,
+            ),
             const SizedBox(height: 24),
-            const _SectionHeader(title: 'Posiciones del Grupo', icon: Icons.leaderboard),
+            const _SectionHeader(
+              title: 'Posiciones del Grupo',
+              icon: Icons.leaderboard,
+            ),
             const SizedBox(height: 8),
             for (final row in data.ranking) _RankingRowCard(row: row),
             const SizedBox(height: 24),
-            const _SectionHeader(title: 'Novedades del Feed', icon: Icons.dynamic_feed),
+            const _SectionHeader(
+              title: 'Novedades del Feed',
+              icon: Icons.dynamic_feed,
+            ),
             const SizedBox(height: 8),
             FeedList(
               posts: data.feedPage.posts,
@@ -276,9 +323,9 @@ class _SectionHeader extends StatelessWidget {
         Text(
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                letterSpacing: -0.3,
-              ),
+            fontWeight: FontWeight.bold,
+            letterSpacing: -0.3,
+          ),
         ),
       ],
     );
@@ -286,30 +333,20 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.aggregate});
+  const _SummaryCard({
+    required this.aggregate,
+    required this.needsHealthConnection,
+    required this.onConnectHealth,
+  });
 
   final DailyActivityAggregate? aggregate;
+  final bool needsHealthConnection;
+  final VoidCallback onConnectHealth;
 
   @override
   Widget build(BuildContext context) {
-    if (aggregate == null) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Row(
-            children: [
-              const Icon(Icons.health_and_safety_outlined, size: 36, color: AppColors.primaryLight),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  'Conecta tu fuente de salud (Apple Health o Health Connect) para sincronizar tu día.',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+    if (needsHealthConnection) {
+      return HealthConnectionCard(onConnect: onConnectHealth);
     }
 
     final agg = aggregate!;
@@ -405,8 +442,8 @@ class _MetricTile extends StatelessWidget {
                 child: Text(
                   label,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -481,10 +518,7 @@ class _RankingRowCard extends StatelessWidget {
           backgroundColor: rankColor.withOpacity(0.2),
           child: Text(
             '#${row.rank}',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: rankColor,
-            ),
+            style: TextStyle(fontWeight: FontWeight.bold, color: rankColor),
           ),
         ),
         title: Text(

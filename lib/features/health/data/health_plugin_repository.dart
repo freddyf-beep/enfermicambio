@@ -17,6 +17,8 @@ class HealthPluginRepository implements HealthRepository {
   final Health _health;
   final Duration permissionTimeout;
   bool _configured = false;
+  bool _authorizationRequested = false;
+  HealthReadStatus? _lastReadStatus;
 
   static const _readTypes = <HealthDataType>[
     HealthDataType.STEPS,
@@ -33,53 +35,105 @@ class HealthPluginRepository implements HealthRepository {
   ];
 
   @override
-  Future<bool> requestStepReadPermission() => requestAllPermissions();
+  Future<bool> requestStepReadPermission() => _requestPermissions(
+    _readTypes.sublist(0, 1),
+    _readPermissions.sublist(0, 1),
+  );
 
   @override
   Future<HealthReadResult> readToday({
     required DateTime now,
     required String competitionTimezone,
   }) async {
-    await _configure();
-    final location = timezone.getLocation(competitionTimezone);
-    final localNow = timezone.TZDateTime.from(now.toUtc(), location);
-    final localStart = timezone.TZDateTime(
-      location,
-      localNow.year,
-      localNow.month,
-      localNow.day,
-    );
     try {
-      final points = await _health.getHealthDataFromTypes(
-        types: _readTypes,
-        startTime: localStart,
-        endTime: localNow,
+      await _configure();
+      if (Platform.isAndroid) {
+        final available = await _health.getHealthConnectSdkStatus().timeout(
+          permissionTimeout,
+        );
+        if (available != HealthConnectSdkStatus.sdkAvailable) {
+          return _rememberRead(
+            HealthReadResult(
+              status: HealthReadStatus.sourceUnavailable,
+              samples: const [],
+              lastSyncedAt: DateTime.now().toUtc(),
+              sourcePlatform: _platformName,
+              message: 'Health Connect no está disponible en este dispositivo.',
+            ),
+          );
+        }
+        final hasPermissions = await _health
+            .hasPermissions(_readTypes, permissions: _readPermissions)
+            .timeout(permissionTimeout);
+        if (hasPermissions == false) {
+          return _rememberRead(
+            HealthReadResult(
+              status: HealthReadStatus.permissionDenied,
+              samples: const [],
+              lastSyncedAt: DateTime.now().toUtc(),
+              sourcePlatform: _platformName,
+              message: 'Faltan permisos de lectura en Health Connect.',
+            ),
+          );
+        }
+      }
+
+      final location = timezone.getLocation(competitionTimezone);
+      final localNow = timezone.TZDateTime.from(now.toUtc(), location);
+      final localStart = timezone.TZDateTime(
+        location,
+        localNow.year,
+        localNow.month,
+        localNow.day,
       );
+      final points = await _health
+          .getHealthDataFromTypes(
+            types: _readTypes,
+            startTime: localStart,
+            endTime: localNow,
+          )
+          .timeout(permissionTimeout);
       final samples = points.map(_toSample).toList(growable: false);
-      return HealthReadResult(
-        status: samples.isEmpty
-            ? HealthReadStatus.noData
-            : HealthReadStatus.success,
-        samples: samples,
-        lastSyncedAt: DateTime.now().toUtc(),
-        sourcePlatform: _platformName,
-        message: null,
+      return _rememberRead(
+        HealthReadResult(
+          status: samples.isEmpty
+              ? HealthReadStatus.noData
+              : HealthReadStatus.success,
+          samples: samples,
+          lastSyncedAt: DateTime.now().toUtc(),
+          sourcePlatform: _platformName,
+          message: null,
+        ),
       );
     } on HealthException catch (error) {
-      return HealthReadResult(
-        status: HealthReadStatus.sourceUnavailable,
-        samples: const [],
-        lastSyncedAt: DateTime.now().toUtc(),
-        sourcePlatform: _platformName,
-        message: error.toString(),
+      return _rememberRead(
+        HealthReadResult(
+          status: HealthReadStatus.sourceUnavailable,
+          samples: const [],
+          lastSyncedAt: DateTime.now().toUtc(),
+          sourcePlatform: _platformName,
+          message: error.toString(),
+        ),
+      );
+    } on TimeoutException catch (error) {
+      return _rememberRead(
+        HealthReadResult(
+          status: HealthReadStatus.retryableFailure,
+          samples: const [],
+          lastSyncedAt: DateTime.now().toUtc(),
+          sourcePlatform: _platformName,
+          message: 'La lectura de salud tardó demasiado: $error',
+        ),
       );
     } on Exception catch (error) {
-      return HealthReadResult(
-        status: HealthReadStatus.retryableFailure,
-        samples: const [],
-        lastSyncedAt: DateTime.now().toUtc(),
-        sourcePlatform: _platformName,
-        message: error.toString(),
+      return _rememberRead(
+        HealthReadResult(
+          status: HealthReadStatus.retryableFailure,
+          samples: const [],
+          lastSyncedAt: DateTime.now().toUtc(),
+          sourcePlatform: _platformName,
+          message: error.toString(),
+        ),
       );
     }
   }
@@ -90,54 +144,84 @@ class HealthPluginRepository implements HealthRepository {
     try {
       await _configure();
       if (Platform.isAndroid) {
-        final available = await _health
-            .getHealthConnectSdkStatus()
-            .timeout(permissionTimeout);
+        final available = await _health.getHealthConnectSdkStatus().timeout(
+          permissionTimeout,
+        );
         if (available != HealthConnectSdkStatus.sdkAvailable) {
           return HealthSetupSnapshot(
             platform: platform,
             healthAvailable: false,
             grantedTypes: const {},
+            state: HealthSetupState.unavailable,
             message:
                 'Health Connect no está disponible. Instálalo o actívalo en este dispositivo.',
           );
         }
+
+        final granted = <HealthMetricType>{};
+        for (final type in _readTypes) {
+          final has = await _health
+              .hasPermissions([type], permissions: [HealthDataAccess.READ])
+              .timeout(permissionTimeout);
+          if (has == true) {
+            granted.add(_mapType(type));
+          }
+        }
+        return HealthSetupSnapshot(
+          platform: platform,
+          healthAvailable: true,
+          grantedTypes: granted,
+          state: _androidSetupState(granted),
+          message: null,
+        );
       }
 
-      final granted = <HealthMetricType>{};
-      for (final type in _readTypes) {
-        final has = await _health
-            .hasPermissions([type], permissions: [HealthDataAccess.READ])
-            .timeout(permissionTimeout);
-        if (has == true) {
-          granted.add(_mapType(type));
-        }
-      }
+      // HealthKit intentionally returns null for read permission checks. The
+      // only trustworthy signal is a real read after the authorization sheet.
+      final state = switch (_lastReadStatus) {
+        HealthReadStatus.success => HealthSetupState.connected,
+        HealthReadStatus.noData => HealthSetupState.noData,
+        HealthReadStatus.sourceUnavailable => HealthSetupState.unavailable,
+        HealthReadStatus.retryableFailure => HealthSetupState.retryable,
+        _ when _authorizationRequested => HealthSetupState.requested,
+        _ => HealthSetupState.available,
+      };
       return HealthSetupSnapshot(
         platform: platform,
-        healthAvailable: true,
-        grantedTypes: granted,
-        message: null,
+        healthAvailable: state != HealthSetupState.unavailable,
+        grantedTypes: const {},
+        state: state,
+        message: state == HealthSetupState.requested
+            ? 'Apple Health protege el detalle de los permisos de lectura. Verificaremos el acceso con una lectura real.'
+            : null,
       );
     } on TimeoutException catch (error) {
       return HealthSetupSnapshot(
         platform: platform,
         healthAvailable: false,
         grantedTypes: const {},
-        message: 'Timed out waiting for the health service: $error',
+        state: HealthSetupState.retryable,
+        message: 'La comprobación de salud tardó demasiado: $error',
       );
     } on Exception catch (error) {
       return HealthSetupSnapshot(
         platform: platform,
         healthAvailable: false,
         grantedTypes: const {},
+        state: HealthSetupState.unavailable,
         message: error.toString(),
       );
     }
   }
 
   @override
-  Future<bool> requestAllPermissions() async {
+  Future<bool> requestAllPermissions() =>
+      _requestPermissions(_readTypes, _readPermissions);
+
+  Future<bool> _requestPermissions(
+    List<HealthDataType> types,
+    List<HealthDataAccess> permissions,
+  ) async {
     try {
       await _configure();
       if (Platform.isAndroid) {
@@ -145,25 +229,43 @@ class HealthPluginRepository implements HealthRepository {
         if (!activityStatus.isGranted) {
           return false;
         }
-        final available = await _health
-            .getHealthConnectSdkStatus()
-            .timeout(permissionTimeout);
+        final available = await _health.getHealthConnectSdkStatus().timeout(
+          permissionTimeout,
+        );
         if (available != HealthConnectSdkStatus.sdkAvailable) {
           return false;
         }
       }
-      return await _health
-          .requestAuthorization(
-            _readTypes,
-            permissions: _readPermissions,
-          )
+      final requested = await _health
+          .requestAuthorization(types, permissions: permissions)
           .timeout(permissionTimeout);
+      if (requested) {
+        _authorizationRequested = true;
+      }
+      return requested;
     } on TimeoutException {
       return false;
     } on Exception catch (error) {
       debugPrint('Health permission request failed: $error');
       return false;
     }
+  }
+
+  HealthSetupState _androidSetupState(Set<HealthMetricType> granted) {
+    return switch (_lastReadStatus) {
+      HealthReadStatus.success => HealthSetupState.connected,
+      HealthReadStatus.noData => HealthSetupState.noData,
+      HealthReadStatus.sourceUnavailable => HealthSetupState.unavailable,
+      HealthReadStatus.retryableFailure => HealthSetupState.retryable,
+      _ when granted.isEmpty => HealthSetupState.notGranted,
+      _ when granted.length < _readTypes.length => HealthSetupState.partial,
+      _ => HealthSetupState.available,
+    };
+  }
+
+  HealthReadResult _rememberRead(HealthReadResult result) {
+    _lastReadStatus = result.status;
+    return result;
   }
 
   Future<void> _configure() async {

@@ -12,8 +12,6 @@
 	<string>Enfermicambio accede a tus fotos para registrar comidas y compartirlas en el grupo.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Enfermicambio puede guardar fotos de comida en tu biblioteca cuando lo indiques.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Enfermicambio no graba audio; este permiso solo se declara si el sistema lo solicita al usar la cámara.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

@@ -16,16 +16,16 @@ class AppEnvironment {
   );
 
   static String get supabaseUrl =>
-      _firstNonEmpty(_supabaseUrlDefine, dotenv.maybeGet('SUPABASE_URL') ?? '');
+      _firstNonEmpty(_supabaseUrlDefine, _dotenvValue('SUPABASE_URL'));
 
-  static String get supabaseAnonKey => _firstNonEmpty(
-    _supabaseAnonKeyDefine,
-    dotenv.maybeGet('SUPABASE_ANON_KEY') ?? '',
-  );
+  static String get supabaseAnonKey =>
+      _firstNonEmpty(_supabaseAnonKeyDefine, _dotenvValue('SUPABASE_ANON_KEY'));
 
   static String get competitionTimezone => _firstNonEmpty(
     _competitionTzDefine,
-    dotenv.maybeGet('COMPETITION_TZ') ?? 'America/Santiago',
+    _dotenvValue('COMPETITION_TZ').isEmpty
+        ? 'America/Santiago'
+        : _dotenvValue('COMPETITION_TZ'),
   );
 
   static bool get isConfigured =>
@@ -43,5 +43,10 @@ class AppEnvironment {
 
   static String _firstNonEmpty(String primary, String fallback) {
     return primary.isNotEmpty ? primary : fallback;
+  }
+
+  static String _dotenvValue(String name) {
+    if (!dotenv.isInitialized) return '';
+    return dotenv.maybeGet(name) ?? '';
   }
 }

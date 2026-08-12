@@ -51,7 +51,10 @@ class FakeNotificationRepository implements NotificationRepository {
       NotificationPreferences.allEnabled;
 
   @override
-  Future<void> setPreference(NotificationCategory category, bool enabled) async {}
+  Future<void> setPreference(
+    NotificationCategory category,
+    bool enabled,
+  ) async {}
 
   @override
   Stream<int> watchUnreadCount() => Stream<int>.empty();
@@ -79,22 +82,25 @@ AppNotification notification({
 
 void main() {
   testWidgets('renders the notification list grouped by day', (tester) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day, 12);
+    final older = today.subtract(const Duration(days: 2));
     final repository = FakeNotificationRepository([
-      notification(id: 'n1', createdAt: DateTime(2026, 8, 11, 18, 30)),
+      notification(id: 'n1', createdAt: today),
       notification(
         id: 'n2',
         type: 'round_result',
         title: 'Felipe ganó la ronda',
         body: '🏆 Felipe ganó la ronda de la mañana.',
         isRead: true,
-        createdAt: DateTime(2026, 8, 11, 8, 0),
+        createdAt: DateTime(now.year, now.month, now.day, 8),
       ),
       notification(
         id: 'n3',
         type: 'season',
         title: 'Fin de temporada',
         body: '👑 Cristian ganó la temporada.',
-        createdAt: DateTime(2026, 8, 9, 12, 0),
+        createdAt: older,
       ),
     ]);
 
@@ -104,7 +110,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Hoy'), findsOneWidget);
-    expect(find.text('9 ago'), findsOneWidget);
+    expect(
+      find.text('${older.day} ${_shortMonth(older.month)}'),
+      findsOneWidget,
+    );
     expect(find.text('Samir te pasó'), findsOneWidget);
     expect(find.text('Felipe ganó la ronda'), findsOneWidget);
     expect(find.text('Fin de temporada'), findsOneWidget);
@@ -112,9 +121,7 @@ void main() {
   });
 
   testWidgets('tapping an unread notification marks it read', (tester) async {
-    final repository = FakeNotificationRepository([
-      notification(id: 'n1'),
-    ]);
+    final repository = FakeNotificationRepository([notification(id: 'n1')]);
 
     await tester.pumpWidget(
       MaterialApp(home: NotificationsScreen(repository: repository)),
@@ -174,3 +181,18 @@ void main() {
     expect(repository.readIds, contains('n1'));
   });
 }
+
+String _shortMonth(int month) => const [
+  'ene',
+  'feb',
+  'mar',
+  'abr',
+  'may',
+  'jun',
+  'jul',
+  'ago',
+  'sep',
+  'oct',
+  'nov',
+  'dic',
+][month - 1];

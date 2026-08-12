@@ -43,7 +43,7 @@ class EnfermicambioApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.dark,
       home: AppEnvironment.isConfigured
           ? AuthGate(
               child: AppShell(onResume: HealthSyncBootstrap.syncOnResume),

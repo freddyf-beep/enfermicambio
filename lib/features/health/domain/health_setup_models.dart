@@ -15,7 +15,10 @@ class HealthPermissionSetting {
   final String title;
   final String description;
   final HealthMetricType metric;
-  final bool granted;
+
+  /// `null` means the platform intentionally does not disclose the read
+  /// permission state (currently Apple HealthKit).
+  final bool? granted;
   final bool supported;
 }
 
@@ -35,5 +38,5 @@ class HealthSetupStatus {
   final String? message;
 
   int get grantedCount =>
-      permissions.where((permission) => permission.granted).length;
+      permissions.where((permission) => permission.granted == true).length;
 }

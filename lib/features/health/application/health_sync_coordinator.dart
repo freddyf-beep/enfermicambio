@@ -30,8 +30,7 @@ class HealthSyncCoordinator {
     _isSyncing = true;
     try {
       final result = await syncService.sync(now: now);
-      if (result.readStatus == HealthReadStatus.success ||
-          result.readStatus == HealthReadStatus.noData) {
+      if (result.readStatus == HealthReadStatus.success) {
         _lastSyncedAt = DateTime.now().toUtc();
       }
       _lastResult = result;
