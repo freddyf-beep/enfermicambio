@@ -51,6 +51,22 @@ class OfflinePostService {
     }
   }
 
+  Future<void> toggleReaction({
+    required String postId,
+    required String userId,
+    required String emoji,
+  }) async {
+    try {
+      await _posts.toggleReaction(postId: postId, userId: userId, emoji: emoji);
+    } on Exception {
+      final queue = await _ensureQueue();
+      await queue.enqueue(
+        operation: 'toggle_reaction',
+        payload: {'post_id': postId, 'user_id': userId, 'emoji': emoji},
+      );
+    }
+  }
+
   Future<void> addComment({
     required String postId,
     required String authorId,
@@ -79,6 +95,12 @@ class OfflinePostService {
           );
         case 'add_reaction':
           await _posts.addReaction(
+            postId: write.payload['post_id'] as String,
+            userId: write.payload['user_id'] as String,
+            emoji: write.payload['emoji'] as String,
+          );
+        case 'toggle_reaction':
+          await _posts.toggleReaction(
             postId: write.payload['post_id'] as String,
             userId: write.payload['user_id'] as String,
             emoji: write.payload['emoji'] as String,

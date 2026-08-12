@@ -41,9 +41,11 @@ class SupabaseDailyActivitySink implements DailyActivitySink {
   }
 
   String _dateOnly(DateTime value) {
-    final utc = value.toUtc();
-    return '${utc.year.toString().padLeft(4, '0')}-'
-        '${utc.month.toString().padLeft(2, '0')}-'
-        '${utc.day.toString().padLeft(2, '0')}';
+    // [aggregate.date] is already a competition-calendar date, not an
+    // instant. Converting it to UTC can move it to the previous day for
+    // positive-offset zones such as Android devices in India or Australia.
+    return '${value.year.toString().padLeft(4, '0')}-'
+        '${value.month.toString().padLeft(2, '0')}-'
+        '${value.day.toString().padLeft(2, '0')}';
   }
 }

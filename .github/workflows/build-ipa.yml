@@ -4,7 +4,8 @@ name: build-ipa
 # (7-day validity, no paid developer account required). Free re-signing does not
 # make HealthKit available; iPhone health data uses the Health Auto Export bridge.
 #
-# No repository secrets required.
+# Configure SUPABASE_URL and SUPABASE_ANON_KEY as repository secrets before
+# dispatching the workflow; COMPETITION_TZ defaults to America/Santiago.
 
 on:
   workflow_dispatch:
@@ -27,20 +28,24 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Prepare environment placeholders
-        run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
-        shell: pwsh
+      - name: Verify Dart code
+        run: |
+          dart format --output=none --set-exit-if-changed lib test
+          flutter analyze
+          flutter test
 
       - name: Build iOS app (device, cloud unsigned)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          COMPETITION_TZ: ${{ secrets.COMPETITION_TZ || 'America/Santiago' }}
         run: |
           # --no-codesign produces an unsigned .app; the device slice is then
           # packaged and sideloaded with a free Apple ID.
           flutter build ios --release --no-codesign \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=COMPETITION_TZ="$COMPETITION_TZ"
 
       - name: Package IPA
         run: |

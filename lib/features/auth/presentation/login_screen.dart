@@ -94,9 +94,9 @@ class _LoginScreenState extends State<LoginScreen> {
       _emailController.text = email;
       _passwordController.text = '123456';
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Cargado usuario $name ($email)')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Cargado usuario $name ($email)')));
   }
 
   @override
@@ -113,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryLight.withOpacity(0.15),
+                    color: AppColors.primaryLight.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -127,17 +127,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   'Enfermicambio',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.5,
-                      ),
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: -0.5,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   'Competencia fitness privada entre 4 amigos.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 28),
                 FilledButton.icon(
@@ -155,7 +155,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
-                        'O inicio rápido para los 4 usuarios',
+                        'Acceso rápido: 2 de 4 cuentas activadas',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -173,22 +173,32 @@ class _LoginScreenState extends State<LoginScreen> {
                     ActionChip(
                       avatar: const Icon(Icons.person, size: 16),
                       label: const Text('Freddy'),
-                      onPressed: () => _quickFillUser('udefret12@gmail.com', 'Freddy'),
+                      onPressed: () =>
+                          _quickFillUser('udefret12@gmail.com', 'Freddy'),
                     ),
                     ActionChip(
                       avatar: const Icon(Icons.person, size: 16),
                       label: const Text('Felipe'),
-                      onPressed: () => _quickFillUser('felipe@gmail.com', 'Felipe'),
+                      onPressed: () =>
+                          _quickFillUser('felipe.seron03@gmail.com', 'Felipe'),
                     ),
-                    ActionChip(
-                      avatar: const Icon(Icons.person, size: 16),
-                      label: const Text('Cristian'),
-                      onPressed: () => _quickFillUser('cristiancarrillo262@gmail.com', 'Cristian'),
+                    const Tooltip(
+                      message:
+                          'La cuenta de Cristian aún no está creada en Supabase.',
+                      child: ActionChip(
+                        avatar: Icon(Icons.person, size: 16),
+                        label: Text('Cristian'),
+                        onPressed: null,
+                      ),
                     ),
-                    ActionChip(
-                      avatar: const Icon(Icons.person, size: 16),
-                      label: const Text('Samir'),
-                      onPressed: () => _quickFillUser('Samineiror123@gmail.com', 'Samir'),
+                    const Tooltip(
+                      message:
+                          'La cuenta de Samir aún no está creada en Supabase.',
+                      child: ActionChip(
+                        avatar: Icon(Icons.person, size: 16),
+                        label: Text('Samir'),
+                        onPressed: null,
+                      ),
                     ),
                   ],
                 ),

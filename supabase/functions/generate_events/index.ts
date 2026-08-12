@@ -2,15 +2,51 @@
 // for the syncing user and emit notifications: daily ranking overtakes,
 // leader changes, step milestones, personal records and the daily goal.
 //
-// Auth: publishable (the caller's JWT). The body user_id must match the
-// authenticated user; nobody can generate events on behalf of someone else.
-// All emissions are idempotent via payload dedupe keys and rank_positions.
+// Auth: the caller's JWT or the per-user Health Auto Export bridge token. The
+// body user_id must match the resolved identity; nobody can generate events on
+// behalf of someone else. All emissions are idempotent via payload dedupe keys
+// and rank_positions.
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 import { createClient } from "@supabase/supabase-js";
 
 const STEP_MILESTONES = [5000, 10000, 15000, 20000];
+
+function bearerToken(req: Request): string | null {
+  const authorization = req.headers.get("authorization") ?? "";
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
+  const value = match?.[1]?.trim() ||
+    req.headers.get("x-health-export-token")?.trim() || "";
+  return value.length >= 32 && value.length <= 256 ? value : null;
+}
+
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function resolveUserId(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  token: string,
+): Promise<string | null> {
+  const { data: userData } = await supabaseAdmin.auth.getUser(token);
+  if (userData.user?.id) return userData.user.id;
+
+  const tokenHash = await sha256Hex(token);
+  const { data: bridgeRow } = await supabaseAdmin
+    .from("health_ingestion_tokens")
+    .select("user_id")
+    .eq("token_hash", tokenHash)
+    .eq("active", true)
+    .maybeSingle();
+  return (bridgeRow?.user_id as string | undefined) ?? null;
+}
 
 async function loadConfig(supabaseAdmin: ReturnType<typeof createClient>) {
   const { data, error } = await supabaseAdmin
@@ -68,7 +104,7 @@ async function notify(
 
 export default {
   fetch: withSupabase(
-    { auth: ["publishable"] },
+    { auth: "none" },
     async (req, ctx) => {
       try {
         return await handle(ctx.supabaseAdmin, req);
@@ -85,7 +121,7 @@ export default {
 async function handle(
   supabaseAdmin: ReturnType<typeof createClient>,
   req: Request,
-): Promise<Response> {
+  ): Promise<Response> {
   let body: { user_id?: string; date?: string };
   try {
     body = await req.json();
@@ -93,17 +129,17 @@ async function handle(
     return Response.json({ error: "invalid body" }, { status: 400 });
   }
 
-  const token = (req.headers.get("authorization") ?? "").replace("Bearer ", "");
-  const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(
-    token,
-  );
-  if (userErr || !userData.user) {
+  const token = bearerToken(req);
+  if (!token) {
     return Response.json({ error: "unauthenticated" }, { status: 401 });
   }
-  if (body.user_id !== userData.user.id) {
+  const userId = await resolveUserId(supabaseAdmin, token);
+  if (!userId) {
+    return Response.json({ error: "unauthenticated" }, { status: 401 });
+  }
+  if (!body.user_id || body.user_id !== userId) {
     return Response.json({ error: "forbidden" }, { status: 403 });
   }
-  const userId = body.user_id;
 
   const config = await loadConfig(supabaseAdmin);
   const tz = (config.get("competition_timezone") as string) ?? "America/Santiago";

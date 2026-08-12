@@ -64,6 +64,7 @@ class HealthReadResult {
     required this.lastSyncedAt,
     this.sourcePlatform = 'unknown',
     this.message,
+    this.workouts = const [],
   });
 
   final HealthReadStatus status;
@@ -71,6 +72,51 @@ class HealthReadResult {
   final DateTime lastSyncedAt;
   final String sourcePlatform;
   final String? message;
+  final List<HealthWorkoutRecord> workouts;
+}
+
+/// A workout read from Apple Health/Health Connect. It stays independent from
+/// the persistence model until Supabase assigns the database UUID.
+class HealthWorkoutRecord {
+  const HealthWorkoutRecord({
+    required this.externalId,
+    required this.workoutType,
+    required this.startedAt,
+    required this.endedAt,
+    required this.durationSeconds,
+    this.distanceMeters,
+    this.activeCalories,
+    this.avgSpeed,
+    this.routePoints = const [],
+  });
+
+  final String externalId;
+  final String workoutType;
+  final DateTime startedAt;
+  final DateTime endedAt;
+  final int durationSeconds;
+  final double? distanceMeters;
+  final double? activeCalories;
+  final double? avgSpeed;
+  final List<HealthRoutePoint> routePoints;
+}
+
+class HealthRoutePoint {
+  const HealthRoutePoint({
+    required this.timestamp,
+    required this.latitude,
+    required this.longitude,
+    this.altitude,
+    this.accuracy,
+    this.bearing,
+  });
+
+  final DateTime timestamp;
+  final double latitude;
+  final double longitude;
+  final double? altitude;
+  final double? accuracy;
+  final double? bearing;
 }
 
 class DailyActivityAggregate {
@@ -139,8 +185,6 @@ class DailyActivityAggregate {
 }
 
 abstract interface class HealthRepository {
-  Future<bool> requestStepReadPermission();
-
   Future<HealthReadResult> readToday({
     required DateTime now,
     required String competitionTimezone,

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -19,26 +21,49 @@ class NotificationDeliveryCoordinator {
   static NotificationDeliveryCoordinator ensure({
     LocalNotificationService? service,
   }) {
-    return _instance ??=
-        NotificationDeliveryCoordinator._(
-          service: service ?? FlutterLocalNotificationService(),
-        );
+    return _instance ??= NotificationDeliveryCoordinator._(
+      service: service ?? FlutterLocalNotificationService(),
+    );
   }
 
   final LocalNotificationService service;
   RealtimeChannel? _channel;
+  StreamSubscription<AuthState>? _authSubscription;
+  String? _subscribedUserId;
+  Future<void> _subscriptionQueue = Future<void>.value();
   int _lastShownId = 0;
 
   /// Initializes the OS channel and subscribes to new notification rows.
   Future<void> start() async {
     await service.initialize();
-    _subscribe();
+    _authSubscription ??= Supabase.instance.client.auth.onAuthStateChange
+        .listen((state) => _queueSubscription(state.session));
+    _queueSubscription(Supabase.instance.client.auth.currentSession);
   }
 
-  void _subscribe() {
-    if (_channel != null) return;
+  void _queueSubscription(Session? session) {
+    _subscriptionQueue = _subscriptionQueue
+        .then((_) => _setSubscription(session))
+        .catchError((_) {
+          // A failed channel is retried when the next auth/lifecycle event
+          // arrives; notification delivery must never affect app startup.
+        });
+  }
+
+  Future<void> _setSubscription(Session? session) async {
+    final userId = session?.user.id;
+    if (_channel != null && _subscribedUserId == userId) return;
+
+    final previous = _channel;
+    _channel = null;
+    _subscribedUserId = userId;
+    if (previous != null) {
+      await Supabase.instance.client.removeChannel(previous);
+    }
+    if (userId == null) return;
+
     _channel = Supabase.instance.client
-        .channel('notification-delivery')
+        .channel('notification-delivery-$userId')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
@@ -63,18 +88,17 @@ class NotificationDeliveryCoordinator {
     final title = (record['title'] as String?) ?? 'Enfermicambio';
     final body = (record['body'] as String?) ?? '';
     if (body.isEmpty) return;
-    await service.show(
-      id: ++_lastShownId,
-      title: title,
-      body: body,
-    );
+    await service.show(id: ++_lastShownId, title: title, body: body);
   }
 
   void dispose() {
+    _authSubscription?.cancel();
+    _authSubscription = null;
     final channel = _channel;
     if (channel != null) {
       Supabase.instance.client.removeChannel(channel);
       _channel = null;
     }
+    _subscribedUserId = null;
   }
 }

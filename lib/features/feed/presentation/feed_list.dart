@@ -30,13 +30,17 @@ class FeedList extends StatelessWidget {
           padding: const EdgeInsets.all(32),
           child: Column(
             children: [
-              const Icon(Icons.forum_outlined, size: 48, color: AppColors.primaryLight),
+              const Icon(
+                Icons.forum_outlined,
+                size: 48,
+                color: AppColors.primaryLight,
+              ),
               const SizedBox(height: 12),
               Text(
                 'No hay publicaciones aún',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               Text(
@@ -101,10 +105,17 @@ class _PostCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 18,
-                  backgroundColor: AppColors.primaryLight.withOpacity(0.2),
+                  backgroundColor: AppColors.primaryLight.withValues(
+                    alpha: 0.2,
+                  ),
                   child: Text(
-                    post.authorName.isEmpty ? '?' : post.authorName[0].toUpperCase(),
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primaryLight),
+                    post.authorName.isEmpty
+                        ? '?'
+                        : post.authorName[0].toUpperCase(),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primaryLight,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -114,18 +125,33 @@ class _PostCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(post.authorName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          Text(
+                            post.authorName,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
                           if (post.isSystem) ...[
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
-                                color: AppColors.trophyPurple.withOpacity(0.2),
+                                color: AppColors.trophyPurple.withValues(
+                                  alpha: 0.2,
+                                ),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
                                 'SISTEMA',
-                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.trophyPurple),
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.trophyPurple,
+                                ),
                               ),
                             ),
                           ],
@@ -133,20 +159,29 @@ class _PostCard extends StatelessWidget {
                       ),
                       Text(
                         DateFormat.MMMd('es').add_Hm().format(post.createdAt),
-                        style: theme.textTheme.bodySmall?.copyWith(fontSize: 11),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: badgeColor.withOpacity(0.15),
+                    color: badgeColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
                     _typeLabel(post.type),
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: badgeColor),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: badgeColor,
+                    ),
                   ),
                 ),
               ],
@@ -175,7 +210,10 @@ class _PostCard extends StatelessWidget {
                       errorBuilder: (_, _, _) => Container(
                         width: 140,
                         color: AppColors.darkSurfaceVariant,
-                        child: const Icon(Icons.broken_image_outlined, color: AppColors.streakOrange),
+                        child: const Icon(
+                          Icons.broken_image_outlined,
+                          color: AppColors.streakOrange,
+                        ),
                       ),
                     ),
                   ),
@@ -190,14 +228,26 @@ class _PostCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                     onTap: () => onReact!(post),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       child: Row(
                         children: [
-                          const Icon(Icons.favorite_border, size: 18, color: AppColors.streakOrange),
+                          const Icon(
+                            Icons.favorite_border,
+                            size: 18,
+                            color: AppColors.streakOrange,
+                          ),
                           const SizedBox(width: 4),
                           Text(
-                            post.reactionCount > 0 ? '${post.reactionCount}' : 'Reaccionar',
-                            style: const TextStyle(fontSize: 12, color: AppColors.streakOrange),
+                            post.reactionCount > 0
+                                ? '${post.reactionCount}'
+                                : 'Reaccionar',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.streakOrange,
+                            ),
                           ),
                         ],
                       ),
@@ -210,14 +260,26 @@ class _PostCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                     onTap: () => onComment!(post),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       child: Row(
                         children: [
-                          const Icon(Icons.chat_bubble_outline, size: 18, color: AppColors.primaryLight),
+                          const Icon(
+                            Icons.chat_bubble_outline,
+                            size: 18,
+                            color: AppColors.primaryLight,
+                          ),
                           const SizedBox(width: 4),
                           Text(
-                            post.commentCount > 0 ? '${post.commentCount}' : 'Comentar',
-                            style: const TextStyle(fontSize: 12, color: AppColors.primaryLight),
+                            post.commentCount > 0
+                                ? '${post.commentCount}'
+                                : 'Comentar',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primaryLight,
+                            ),
                           ),
                         ],
                       ),

@@ -69,7 +69,9 @@ class _RankingTabState extends State<RankingTab> {
       setState(() {
         _status = _rows == null
             ? AsyncViewStatus.backendError(error.toString())
-            : AsyncViewStatus.offline('No se pudo actualizar la tabla de clasificación.');
+            : AsyncViewStatus.offline(
+                'No se pudo actualizar la tabla de clasificación.',
+              );
       });
     }
   }
@@ -172,7 +174,8 @@ class _RankingTabState extends State<RankingTab> {
                   _CategoryChip(
                     label: 'Entrenamientos',
                     icon: Icons.fitness_center,
-                    selected: _selectedCategory == RankingCategory.entrenamientos,
+                    selected:
+                        _selectedCategory == RankingCategory.entrenamientos,
                     onSelected: () {
                       _selectedCategory = RankingCategory.entrenamientos;
                       _onSelectionChanged();
@@ -205,10 +208,7 @@ class _RankingTabState extends State<RankingTab> {
 
             // Leaderboard Cards
             for (final row in rows)
-              _RankingCard(
-                row: row,
-                category: _selectedCategory,
-              ),
+              _RankingCard(row: row, category: _selectedCategory),
           ],
         ),
       ),
@@ -233,7 +233,11 @@ class _CategoryChip extends StatelessWidget {
   Widget build(BuildContext context) {
     return FilterChip(
       showCheckmark: false,
-      avatar: Icon(icon, size: 16, color: selected ? Colors.white : AppColors.primaryLight),
+      avatar: Icon(
+        icon,
+        size: 16,
+        color: selected ? Colors.white : AppColors.primaryLight,
+      ),
       label: Text(label),
       selected: selected,
       onSelected: (_) => onSelected(),
@@ -244,10 +248,7 @@ class _CategoryChip extends StatelessWidget {
 }
 
 class _RankingCard extends StatelessWidget {
-  const _RankingCard({
-    required this.row,
-    required this.category,
-  });
+  const _RankingCard({required this.row, required this.category});
 
   final RankingRow row;
   final RankingCategory category;
@@ -289,7 +290,7 @@ class _RankingCard extends StatelessWidget {
               height: 44,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: rankColor.withOpacity(0.15),
+                color: rankColor.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
                 border: Border.all(color: rankColor, width: 2),
               ),

@@ -6,8 +6,8 @@ import '../domain/weight_models.dart';
 /// exposed to the other three users.
 class SupabaseWeightRepository {
   SupabaseWeightRepository({required SupabaseClient client, String? userId})
-      : _client = client,
-        _userId = userId ?? client.auth.currentSession?.user.id;
+    : _client = client,
+      _userId = userId ?? client.auth.currentSession?.user.id;
 
   final SupabaseClient _client;
   final String? _userId;
@@ -18,7 +18,10 @@ class SupabaseWeightRepository {
           (throw StateError('No authenticated user for weight log.')));
 
   /// Upserts today's (or [date]'s) entry; one row per user and day.
-  Future<void> upsert({required DateTime date, required double weightKg}) async {
+  Future<void> upsert({
+    required DateTime date,
+    required double weightKg,
+  }) async {
     final dateKey =
         '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     await _client.from('weight_entries').upsert({

@@ -9,8 +9,7 @@ import '../domain/notification_models.dart';
 /// user's rows (RLS restricts to the owner); new rows arrive via Realtime
 /// and are refetched from the database, which stays authoritative.
 class SupabaseNotificationRepository implements NotificationRepository {
-  SupabaseNotificationRepository({required SupabaseClient client})
-      : _client = client;
+  SupabaseNotificationRepository({required this._client});
 
   final SupabaseClient _client;
   RealtimeChannel? _channel;
@@ -68,10 +67,7 @@ class SupabaseNotificationRepository implements NotificationRepository {
 
   @override
   Future<void> markRead(String id) async {
-    await _client
-        .from('notifications')
-        .update({'is_read': true})
-        .eq('id', id);
+    await _client.from('notifications').update({'is_read': true}).eq('id', id);
     await _emitCount();
   }
 
@@ -96,7 +92,10 @@ class SupabaseNotificationRepository implements NotificationRepository {
   }
 
   @override
-  Future<void> setPreference(NotificationCategory category, bool enabled) async {
+  Future<void> setPreference(
+    NotificationCategory category,
+    bool enabled,
+  ) async {
     final current = await fetchPreferences();
     final next = current.copyWithEnabled(category, enabled);
     final userId = _client.auth.currentSession?.user.id;

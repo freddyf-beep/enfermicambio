@@ -59,7 +59,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         _initialLoaded = true;
         _status = _items.isEmpty
             ? AsyncViewStatus.backendError(error.toString())
-            : AsyncViewStatus.offline('No se pudieron cargar las notificaciones.');
+            : AsyncViewStatus.offline(
+                'No se pudieron cargar las notificaciones.',
+              );
       });
     }
   }
@@ -97,7 +99,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (notification.seasonId != null) return 3;
     if (notification.competitionDate != null) return 1;
     return switch (notification.type) {
-      'round_result' || 'round_ending_soon' || 'overtake' ||
+      'round_result' ||
+      'round_ending_soon' ||
+      'overtake' ||
       'leader_change' => 1,
       'season' => 3,
       'feed_post' || 'comment' || 'reaction' || 'workout' => 0,
@@ -184,9 +188,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     child: Text(
                       _dayLabel(notification.createdAt),
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: AppColors.primaryLight,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        color: AppColors.primaryLight,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -210,8 +214,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (_sameDay(date, now)) return 'Hoy';
     if (_sameDay(date, now.subtract(const Duration(days: 1)))) return 'Ayer';
     final monthNames = const [
-      'ene', 'feb', 'mar', 'abr', 'may', 'jun',
-      'jul', 'ago', 'sep', 'oct', 'nov', 'dic',
+      'ene',
+      'feb',
+      'mar',
+      'abr',
+      'may',
+      'jun',
+      'jul',
+      'ago',
+      'sep',
+      'oct',
+      'nov',
+      'dic',
     ];
     return '${date.day} ${monthNames[date.month - 1]}';
   }
@@ -230,10 +244,10 @@ class _NotificationTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       color: notification.isRead
           ? null
-          : AppColors.primaryLight.withOpacity(0.06),
+          : AppColors.primaryLight.withValues(alpha: 0.06),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: AppColors.primaryLight.withOpacity(0.12),
+          backgroundColor: AppColors.primaryLight.withValues(alpha: 0.12),
           child: _iconFor(notification.type),
         ),
         title: Text(
@@ -284,8 +298,7 @@ class _NotificationTile extends StatelessWidget {
         'reaction' => Icons.favorite,
         'mission' => Icons.flag,
         'season' => Icons.emoji_events,
-        'steps_milestone' || 'personal_record' || 'daily_goal' =>
-          Icons.bolt,
+        'steps_milestone' || 'personal_record' || 'daily_goal' => Icons.bolt,
         'weight_entry_goal' || 'weight_change' => Icons.monitor_weight,
         _ => Icons.notifications,
       },

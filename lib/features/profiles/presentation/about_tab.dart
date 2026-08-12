@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -7,6 +8,7 @@ import '../../../shared/ui/async_view_status.dart';
 import '../../app/data/health_sync_bootstrap.dart';
 import '../../health/data/health_plugin_repository.dart';
 import '../../health/presentation/health_setup_screen.dart';
+import '../../health/presentation/health_auto_export_setup_screen.dart';
 import '../../notifications/data/supabase_notification_repository.dart';
 import '../../notifications/domain/notification_models.dart';
 import '../../weight/presentation/weight_screen.dart';
@@ -91,18 +93,9 @@ class _AboutTabState extends State<AboutTab> {
               Icons.health_and_safety_outlined,
               color: AppColors.primaryLight,
             ),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => HealthSetupScreen(
-                    repository: HealthPluginRepository(),
-                    onConnectionVerified: () async {
-                      await HealthSyncBootstrap.syncNow();
-                    },
-                  ),
-                ),
-              );
-            },
+            onPressed: defaultTargetPlatform == TargetPlatform.iOS
+                ? _openHealthAutoExportSetup
+                : _openHealthSetup,
           ),
         ],
       ),
@@ -124,7 +117,7 @@ class _AboutTabState extends State<AboutTab> {
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryLight.withOpacity(0.15),
+                    color: AppColors.primaryLight.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -187,7 +180,7 @@ class _AboutTabState extends State<AboutTab> {
                     leading: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: AppColors.fitnessGreen.withOpacity(0.15),
+                        color: AppColors.fitnessGreen.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
@@ -235,6 +228,53 @@ class _AboutTabState extends State<AboutTab> {
       'cycling' => Icons.directions_bike,
       _ => Icons.fitness_center,
     };
+  }
+
+  Future<void> _openHealthSetup() async {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Configurar puente de salud'),
+          content: const Text(
+            'En iPhone la app recibe los datos a través de Health Auto Export. '
+            'En esa aplicación abre la automatización EnfermiCambio, pulsa '
+            'Actualizar y luego vuelve a EnfermiCambio para refrescar.',
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const HealthAutoExportSetupScreen(),
+                  ),
+                );
+              },
+              child: const Text('Configurar puente'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => HealthSetupScreen(
+          repository: HealthPluginRepository(),
+          onConnectionVerified: () async {
+            await HealthSyncBootstrap.syncNow();
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openHealthAutoExportSetup() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const HealthAutoExportSetupScreen()),
+    );
   }
 }
 
@@ -352,7 +392,7 @@ class _ProfileTile extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 28,
-              backgroundColor: AppColors.primaryLight.withOpacity(0.2),
+              backgroundColor: AppColors.primaryLight.withValues(alpha: 0.2),
               child: Text(
                 profile.displayName.isEmpty
                     ? '?'

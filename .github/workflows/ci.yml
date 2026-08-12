@@ -24,10 +24,6 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Prepare environment placeholders
-        run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
-        shell: pwsh
-
       - name: Verify formatting
         run: dart format --output=none --set-exit-if-changed lib test
 
@@ -60,18 +56,16 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Prepare environment placeholders
-        run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
-        shell: pwsh
-
       - name: Build debug APK
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          COMPETITION_TZ: ${{ secrets.COMPETITION_TZ || 'America/Santiago' }}
         run: |
           flutter build apk --debug \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=COMPETITION_TZ="$COMPETITION_TZ"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -103,15 +97,13 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Prepare environment placeholders
-        run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
-        shell: pwsh
-
       - name: Build iOS (no codesign)
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          COMPETITION_TZ: ${{ secrets.COMPETITION_TZ || 'America/Santiago' }}
         run: |
           flutter build ios --debug --no-codesign \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=COMPETITION_TZ="$COMPETITION_TZ"

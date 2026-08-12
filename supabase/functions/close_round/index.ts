@@ -154,14 +154,29 @@ async function handle(
     .select("display_name")
     .eq("id", winnerId)
     .single();
-  await supabaseAdmin.from("posts").insert({
-    author_id: winnerId,
-    post_type: "round_result",
-    caption:
-      `${winnerProfile?.display_name ?? "Someone"} won the ` +
-      `${round} round (${start}-${end}).`,
-    system_generated: true,
-  });
+  // The ledger makes points idempotent, so retries must not create duplicate
+  // feed posts for the same round either.
+  const postMarker = `round:${round}:${competitionDate}`;
+  const { data: existingPost, error: existingPostError } = await supabaseAdmin
+    .from("posts")
+    .select("id")
+    .eq("post_type", "round_result")
+    .eq("system_generated", true)
+    .ilike("caption", `%${postMarker}%`)
+    .limit(1)
+    .maybeSingle();
+  if (existingPostError) throw new Error(`round post lookup failed: ${existingPostError.message}`);
+  if (!existingPost) {
+    await supabaseAdmin.from("posts").insert({
+      author_id: winnerId,
+      post_type: "round_result",
+      caption:
+        `${winnerProfile?.display_name ?? "Someone"} won the ` +
+        `${round} round (${start}-${end}) on ${competitionDate}. ` +
+        `[${postMarker}]`,
+      system_generated: true,
+    });
+  }
 
   // Notify all four users about the round result (idempotent per key).
   const roundLabel =

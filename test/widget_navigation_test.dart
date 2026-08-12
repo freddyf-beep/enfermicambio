@@ -6,9 +6,15 @@ import 'package:enfermicambio/shared/ui/app_theme.dart';
 import 'mocks/user_mocks.dart';
 
 void main() {
-  testWidgets('Navegación de las 5 pestañas en español en el AppShell', (tester) async {
+  testWidgets('Navegación de las 5 pestañas en español en el AppShell', (
+    tester,
+  ) async {
     final mockTabs = [
-      Scaffold(body: Center(child: Text('Vista HOY de ${UserMocks.fourProfiles[0].displayName}'))),
+      Scaffold(
+        body: Center(
+          child: Text('Vista HOY de ${UserMocks.fourProfiles[0].displayName}'),
+        ),
+      ),
       Scaffold(body: Center(child: Text('Vista RANKING del Grupo'))),
       Scaffold(body: Center(child: Text('Vista REGISTRAR Alimentos'))),
       Scaffold(body: Center(child: Text('Vista JUEGO y Puntos'))),

@@ -10,9 +10,6 @@ class FakeHealthRepository implements HealthRepository {
   final HealthReadResult result;
 
   @override
-  Future<bool> requestStepReadPermission() async => true;
-
-  @override
   Future<HealthReadResult> readToday({
     required DateTime now,
     required String competitionTimezone,

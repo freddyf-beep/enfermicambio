@@ -58,7 +58,7 @@ class GameTab extends StatefulWidget {
 
 class _GameTabState extends State<GameTab> {
   late final SupabaseGameRepository _repository;
-  late final RealtimeChannel _channel;
+  RealtimeChannel? _channel;
   GameSnapshot? _snapshot;
   AsyncViewStatus? _status;
   bool _claiming = false;
@@ -78,7 +78,10 @@ class _GameTabState extends State<GameTab> {
   @override
   void dispose() {
     if (widget.loadFromBackend) {
-      Supabase.instance.client.removeChannel(_channel);
+      final channel = _channel;
+      if (channel != null) {
+        Supabase.instance.client.removeChannel(channel);
+      }
     }
     super.dispose();
   }
@@ -553,6 +556,7 @@ class _BattlePassTrack extends StatelessWidget {
         .map((t) => t.thresholdPoints)
         .where((p) => p > totalPoints)
         .fold<double>(totalPoints, (a, b) => b < a ? b.toDouble() : a);
+    final progressTarget = nextThreshold <= 0 ? 1.0 : nextThreshold;
 
     return Card(
       color: AppColors.darkSurfaceVariant,
@@ -575,7 +579,7 @@ class _BattlePassTrack extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(6),
                     child: LinearProgressIndicator(
-                      value: totalPoints / nextThreshold,
+                      value: (totalPoints / progressTarget).clamp(0.0, 1.0),
                       minHeight: 10,
                       backgroundColor: Colors.black.withValues(alpha: 0.3),
                       color: AppColors.trophyPurple,

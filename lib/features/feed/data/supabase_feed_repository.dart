@@ -37,29 +37,53 @@ class SupabaseFeedRepository implements FeedRepository {
     final slice = hasMore ? data.sublist(0, limit) : data;
     final nextCursor = hasMore ? (slice.last['created_at'] as String) : null;
 
-    final posts = slice
-        .map<FeedPost>((row) {
-          final author = row['profiles'] as Map<String, dynamic>? ?? const {};
-          final media = (row['post_media'] as List<dynamic>? ?? const [])
-              .map((m) => (m as Map<String, dynamic>)['url'] as String)
-              .toList(growable: false);
-          return FeedPost(
-            id: row['id'] as String,
-            authorId: row['author_id'] as String,
-            authorName: (author['display_name'] as String?) ?? 'Unknown',
-            authorAvatarUrl: author['avatar_url'] as String?,
-            type: _mapType(row['post_type'] as String),
-            createdAt: DateTime.parse(row['created_at'] as String),
-            isSystem: row['system_generated'] as bool,
-            caption: row['caption'] as String?,
-            mediaUrls: media,
-            reactionCount: _count(row['reactions']),
-            commentCount: _count(row['comments']),
-          );
-        })
-        .toList(growable: false);
+    final posts = await Future.wait(
+      slice
+          .map<Future<FeedPost>>((row) async {
+            final author = _relationObject(row['profiles']);
+            final media = await _resolveMedia(row['post_media']);
+            return FeedPost(
+              id: row['id'] as String,
+              authorId: row['author_id'] as String,
+              authorName: (author['display_name'] as String?) ?? 'Unknown',
+              authorAvatarUrl: author['avatar_url'] as String?,
+              type: _mapType(row['post_type'] as String),
+              createdAt: DateTime.parse(row['created_at'] as String),
+              isSystem: row['system_generated'] as bool,
+              caption: row['caption'] as String?,
+              mediaUrls: media,
+              reactionCount: _count(row['reactions']),
+              commentCount: _count(row['comments']),
+            );
+          })
+          .toList(growable: false),
+    );
 
     return FeedPage(posts: posts, nextCursor: nextCursor);
+  }
+
+  Future<List<String>> _resolveMedia(dynamic rawMedia) async {
+    final media = rawMedia is List ? rawMedia : const <dynamic>[];
+    final urls = await Future.wait(
+      media.map((raw) async {
+        final value = raw is Map ? raw['url'] as String? : null;
+        if (value == null || value.isEmpty) return null;
+        if (value.startsWith('http://') || value.startsWith('https://')) {
+          return value;
+        }
+
+        final separator = value.indexOf('/');
+        if (separator <= 0 || separator == value.length - 1) return null;
+        final bucket = value.substring(0, separator);
+        final path = value.substring(separator + 1);
+        try {
+          return await _client.storage.from(bucket).createSignedUrl(path, 3600);
+        } on Exception {
+          return null;
+        }
+      }),
+    );
+    return urls.whereType<String>().toList(growable: false);
   }
 
   int _count(dynamic rows) {
@@ -69,6 +93,15 @@ class SupabaseFeedRepository implements FeedRepository {
       return ((first['count'] as num?) ?? 0).toInt();
     }
     return 0;
+  }
+
+  Map<String, dynamic> _relationObject(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return value.cast<String, dynamic>();
+    if (value is List && value.isNotEmpty && value.first is Map) {
+      return (value.first as Map).cast<String, dynamic>();
+    }
+    return const {};
   }
 
   PostType _mapType(String type) {

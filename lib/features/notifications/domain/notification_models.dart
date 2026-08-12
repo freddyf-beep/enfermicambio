@@ -16,17 +16,17 @@ enum NotificationCategory {
   String get dbKey => name;
 
   String get label => switch (this) {
-        NotificationCategory.overtakes => 'Adelantamientos',
-        NotificationCategory.rounds => 'Rondas',
-        NotificationCategory.achievements => 'Logros',
-        NotificationCategory.workouts => 'Entrenamientos',
-        NotificationCategory.feed => 'Publicaciones del feed',
-        NotificationCategory.social => 'Comentarios y reacciones',
-        NotificationCategory.missions => 'Misiones',
-        NotificationCategory.season => 'Temporada',
-        NotificationCategory.personal => 'Mis metas',
-        NotificationCategory.weight => 'Mi peso',
-      };
+    NotificationCategory.overtakes => 'Adelantamientos',
+    NotificationCategory.rounds => 'Rondas',
+    NotificationCategory.achievements => 'Logros',
+    NotificationCategory.workouts => 'Entrenamientos',
+    NotificationCategory.feed => 'Publicaciones del feed',
+    NotificationCategory.social => 'Comentarios y reacciones',
+    NotificationCategory.missions => 'Misiones',
+    NotificationCategory.season => 'Temporada',
+    NotificationCategory.personal => 'Mis metas',
+    NotificationCategory.weight => 'Mi peso',
+  };
 }
 
 class NotificationPreferences {
@@ -43,9 +43,7 @@ class NotificationPreferences {
     NotificationCategory category,
     bool value,
   ) {
-    return NotificationPreferences(
-      enabled: {...enabled, category: value},
-    );
+    return NotificationPreferences(enabled: {...enabled, category: value});
   }
 
   factory NotificationPreferences.fromJson(Map<String, dynamic> json) {
@@ -60,8 +58,8 @@ class NotificationPreferences {
   }
 
   Map<String, dynamic> toJson() => {
-        for (final entry in enabled.entries) entry.key.dbKey: entry.value,
-      };
+    for (final entry in enabled.entries) entry.key.dbKey: entry.value,
+  };
 }
 
 class AppNotification {

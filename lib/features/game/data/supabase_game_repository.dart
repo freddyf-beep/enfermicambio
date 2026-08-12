@@ -11,6 +11,7 @@ class SupabaseGameRepository {
     final rows = await _client
         .from('seasons')
         .select('id, name, starts_at, ends_at, status')
+        .eq('status', 'active')
         .order('starts_at', ascending: false)
         .limit(1);
     if (rows.isEmpty) return null;
@@ -45,9 +46,10 @@ class SupabaseGameRepository {
   }
 
   Future<List<Mission>> dailyMissionsFor(DateTime date) async {
-    final rows = await _client.rpc('daily_missions_for_date', params: {
-      'p_date': _dateParam(date),
-    });
+    final rows = await _client.rpc(
+      'daily_missions_for_date',
+      params: {'p_date': _dateParam(date)},
+    );
     return (rows as List<dynamic>)
         .cast<Map<String, dynamic>>()
         .map(Mission.fromJson)
@@ -58,7 +60,8 @@ class SupabaseGameRepository {
     final rows = await _client
         .from('mission_progress')
         .select(
-            'mission_id, user_id, progress_date, progress, completed, completed_at')
+          'mission_id, user_id, progress_date, progress, completed, completed_at',
+        )
         .eq('progress_date', _dateParam(date));
     return rows
         .cast<Map<String, dynamic>>()
@@ -91,7 +94,9 @@ class SupabaseGameRepository {
   Future<List<Streak>> streaksFor(String userId) async {
     final rows = await _client
         .from('streaks')
-        .select('streak_type, current_count, longest_count, last_qualified_date')
+        .select(
+          'streak_type, current_count, longest_count, last_qualified_date',
+        )
         .eq('user_id', userId)
         .order('current_count', ascending: false);
     return rows
@@ -104,7 +109,8 @@ class SupabaseGameRepository {
     final rows = await _client
         .from('battle_pass_tiers')
         .select(
-            'tier, threshold_points, reward_type, reward_key, reward_name, reward_icon')
+          'tier, threshold_points, reward_type, reward_key, reward_name, reward_icon',
+        )
         .order('tier');
     return rows
         .cast<Map<String, dynamic>>()
@@ -128,42 +134,50 @@ class SupabaseGameRepository {
   }
 
   Future<String> claimBattlePassReward(String seasonId, int tier) async {
-    final result = await _client.rpc('claim_battle_pass_reward', params: {
-      'p_season_id': seasonId,
-      'p_tier': tier,
-    });
+    final result = await _client.rpc(
+      'claim_battle_pass_reward',
+      params: {'p_season_id': seasonId, 'p_tier': tier},
+    );
     return result as String;
   }
 
   Future<List<SeasonResult>> seasonHistory() async {
     final rows = await _client
         .from('season_results')
-        .select('season_id, user_id, position, points, seasons(name), profiles(display_name)');
-    return rows.cast<Map<String, dynamic>>().map((row) {
-      final season = (row['seasons'] as Map<String, dynamic>?) ?? const {};
-      final profile = (row['profiles'] as Map<String, dynamic>?) ?? const {};
-      return SeasonResult(
-        seasonId: row['season_id'] as String,
-        seasonName: (season['name'] as String?) ?? 'Temporada',
-        position: ((row['position'] as num?) ?? 0).toInt(),
-        points: ((row['points'] as num?) ?? 0).toDouble(),
-        userId: row['user_id'] as String?,
-        displayName: (profile['display_name'] as String?) ?? 'Desconocido',
-      );
-    }).toList(growable: false);
+        .select(
+          'season_id, user_id, final_rank, final_points, '
+          'seasons(name), profiles(display_name)',
+        );
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map((row) {
+          final season = _relationObject(row['seasons']);
+          final profile = _relationObject(row['profiles']);
+          return SeasonResult(
+            seasonId: row['season_id'] as String,
+            seasonName: (season['name'] as String?) ?? 'Temporada',
+            position: ((row['final_rank'] as num?) ?? 0).toInt(),
+            points: ((row['final_points'] as num?) ?? 0).toDouble(),
+            userId: row['user_id'] as String?,
+            displayName: (profile['display_name'] as String?) ?? 'Desconocido',
+          );
+        })
+        .toList(growable: false);
   }
 
   Future<List<SeasonKm>> seasonKm(Season season) async {
     final rows = await _client
         .from('daily_activity')
-        .select('user_id, sum:distance_meters')
+        .select('user_id, distance_meters')
         .gte('activity_date', _dateParam(season.startsAt))
         .lte('activity_date', _dateParam(season.endsAt))
         .eq('manual_entry_detected', false);
     final aggregated = <String, double>{};
     for (final row in rows.cast<Map<String, dynamic>>()) {
-      aggregated[row['user_id'] as String] =
-          ((row['sum'] as num?) ?? 0).toDouble();
+      final userId = row['user_id'] as String;
+      aggregated[userId] =
+          (aggregated[userId] ?? 0) +
+          ((row['distance_meters'] as num?) ?? 0).toDouble();
     }
     if (aggregated.isEmpty) return const [];
     final names = <String, String>{};
@@ -175,11 +189,13 @@ class SupabaseGameRepository {
           (row['display_name'] as String?) ?? 'Desconocido';
     }
     final result = aggregated.entries
-        .map((entry) => SeasonKm(
-              userId: entry.key,
-              displayName: names[entry.key] ?? 'Desconocido',
-              km: entry.value / 1000,
-            ))
+        .map(
+          (entry) => SeasonKm(
+            userId: entry.key,
+            displayName: names[entry.key] ?? 'Desconocido',
+            km: entry.value / 1000,
+          ),
+        )
         .toList();
     result.sort((a, b) => b.km.compareTo(a.km));
     return result;
@@ -191,5 +207,14 @@ class SupabaseGameRepository {
     return '${d.year.toString().padLeft(4, '0')}-'
         '${d.month.toString().padLeft(2, '0')}-'
         '${d.day.toString().padLeft(2, '0')}';
+  }
+
+  Map<String, dynamic> _relationObject(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) return value.cast<String, dynamic>();
+    if (value is List && value.isNotEmpty && value.first is Map) {
+      return (value.first as Map).cast<String, dynamic>();
+    }
+    return const {};
   }
 }

@@ -69,7 +69,10 @@ void main() {
 
     test('toJson round-trips disabled categories', () {
       const base = NotificationPreferences.allEnabled;
-      final updated = base.copyWithEnabled(NotificationCategory.overtakes, false);
+      final updated = base.copyWithEnabled(
+        NotificationCategory.overtakes,
+        false,
+      );
       final json = updated.toJson();
       expect(json['overtakes'], isFalse);
       expect(json.containsKey('feed'), isFalse);

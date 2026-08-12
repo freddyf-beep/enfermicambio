@@ -12,9 +12,10 @@ class SupabaseProfileRepository {
       'daily_calorie_target, weekly_workout_target, timezone';
 
   Future<List<UserProfile>> fetchAll() async {
-    final rows = await _client.from('profiles').select(_publicColumns).order(
-          'display_name',
-        );
+    final rows = await _client
+        .from('profiles')
+        .select(_publicColumns)
+        .order('display_name');
     return rows
         .cast<Map<String, dynamic>>()
         .map(_fromRow)
@@ -24,9 +25,7 @@ class SupabaseProfileRepository {
   Future<UserProfile> fetchById(String userId) async {
     final row = await _client
         .from('profiles')
-        .select(
-          '$_publicColumns, notification_preferences, weight_goal_kg',
-        )
+        .select('$_publicColumns, notification_preferences, weight_goal_kg')
         .eq('id', userId)
         .single();
     return _fromRow(row);
@@ -45,7 +44,7 @@ class SupabaseProfileRepository {
       timezone: (row['timezone'] as String?) ?? 'UTC',
       notificationPreferences:
           (row['notification_preferences'] as Map?)?.cast<String, dynamic>() ??
-              const {},
+          const {},
       weightGoalKg: (row['weight_goal_kg'] as num?)?.toDouble(),
     );
   }

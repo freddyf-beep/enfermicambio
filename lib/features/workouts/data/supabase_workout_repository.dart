@@ -68,11 +68,29 @@ class SupabaseWorkoutRepository {
         .toList(growable: false);
   }
 
+  Future<Workout?> findByExternalId({
+    required String source,
+    required String externalId,
+  }) async {
+    final rows = await _client
+        .from('workouts')
+        .select(
+          'id, user_id, workout_type, started_at, ended_at, duration_seconds, '
+          'source, external_id, distance_meters, active_calories, avg_pace, '
+          'avg_speed, route_available',
+        )
+        .eq('source', source)
+        .eq('external_id', externalId)
+        .limit(1);
+    if (rows.isEmpty) return null;
+    return _fromRow(rows.first);
+  }
+
   Future<void> insertAll(List<Workout> workouts) async {
     if (workouts.isEmpty) return;
     final rows = workouts
         .map((w) {
-          return {
+          final row = <String, dynamic>{
             'user_id': w.userId,
             'external_id': w.externalId,
             'source': w.source,
@@ -84,13 +102,35 @@ class SupabaseWorkoutRepository {
             'active_calories': w.activeCalories,
             'avg_pace': w.avgPace,
             'avg_speed': w.avgSpeed,
-            'route_available': w.routeAvailable,
           };
+          // Do not turn an existing route off when the next read lacks route
+          // permission. Inserts use the database default; an available route
+          // is explicitly promoted to true.
+          if (w.routeAvailable) row['route_available'] = true;
+          return row;
         })
         .toList(growable: false);
 
     await _client
         .from('workouts')
-        .upsert(rows, onConflict: 'source,external_id', ignoreDuplicates: true);
+        .upsert(rows, onConflict: 'source,external_id');
+  }
+
+  Workout _fromRow(Map<String, dynamic> row) {
+    return Workout(
+      id: row['id'] as String,
+      userId: row['user_id'] as String,
+      workoutType: row['workout_type'] as String,
+      startedAt: DateTime.parse(row['started_at'] as String),
+      endedAt: DateTime.parse(row['ended_at'] as String),
+      durationSeconds: (row['duration_seconds'] as num).toInt(),
+      source: row['source'] as String,
+      externalId: row['external_id'] as String?,
+      distanceMeters: (row['distance_meters'] as num?)?.toDouble(),
+      activeCalories: (row['active_calories'] as num?)?.toDouble(),
+      avgPace: (row['avg_pace'] as num?)?.toDouble(),
+      avgSpeed: (row['avg_speed'] as num?)?.toDouble(),
+      routeAvailable: (row['route_available'] as bool?) ?? false,
+    );
   }
 }

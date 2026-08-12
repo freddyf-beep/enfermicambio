@@ -25,7 +25,8 @@ class AsyncStateView extends StatelessWidget {
         return _Message(
           icon: Icons.inbox_outlined,
           title: 'Sin datos aún',
-          message: status.message ?? 'No hay datos para mostrar en este momento.',
+          message:
+              status.message ?? 'No hay datos para mostrar en este momento.',
           onRetry: onRetry,
         );
       case AsyncState.offline:
@@ -39,7 +40,8 @@ class AsyncStateView extends StatelessWidget {
         return _Message(
           icon: Icons.lock_outline,
           title: 'Permiso requerido',
-          message: status.message ?? 'Concede el acceso para ver este contenido.',
+          message:
+              status.message ?? 'Concede el acceso para ver este contenido.',
           onRetry: onRetry,
         );
       case AsyncState.backendError:
@@ -47,14 +49,16 @@ class AsyncStateView extends StatelessWidget {
           icon: Icons.cloud_off_outlined,
           title: 'Error de servidor',
           message:
-              status.message ?? 'No se pudo conectar con el servidor. Inténtalo de nuevo.',
+              status.message ??
+              'No se pudo conectar con el servidor. Inténtalo de nuevo.',
           onRetry: onRetry,
         );
       case AsyncState.stale:
         return _Message(
           icon: Icons.schedule,
           title: 'Datos desactualizados',
-          message: status.message ?? 'La última sincronización fue hace un tiempo.',
+          message:
+              status.message ?? 'La última sincronización fue hace un tiempo.',
           onRetry: onRetry,
         );
       case AsyncState.retryableFailure:

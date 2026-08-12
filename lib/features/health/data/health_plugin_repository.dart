@@ -28,26 +28,38 @@ class HealthPluginRepository implements HealthRepository {
     HealthDataType.EXERCISE_TIME,
   ];
 
+  // Health Connect exposes distance as DISTANCE_DELTA and does not expose
+  // Apple's EXERCISE_TIME type. Exercise minutes are derived from workouts
+  // below, so unsupported Apple-only types never block Android authorization.
+  static const _androidDailyReadTypes = <HealthDataType>[
+    HealthDataType.STEPS,
+    HealthDataType.ACTIVE_ENERGY_BURNED,
+    HealthDataType.DISTANCE_DELTA,
+  ];
+
   static const _authorizationTypes = <HealthDataType>[
     ..._dailyReadTypes,
     HealthDataType.WORKOUT,
     HealthDataType.WORKOUT_ROUTE,
   ];
 
-  static const _authorizationPermissions = <HealthDataAccess>[
-    HealthDataAccess.READ,
-    HealthDataAccess.READ,
-    HealthDataAccess.READ,
-    HealthDataAccess.READ,
-    HealthDataAccess.READ,
-    HealthDataAccess.READ,
-  ];
+  List<HealthDataType> get _platformDailyReadTypes =>
+      Platform.isAndroid ? _androidDailyReadTypes : _dailyReadTypes;
 
-  @override
-  Future<bool> requestStepReadPermission() => _requestPermissions(
-    _dailyReadTypes.sublist(0, 1),
-    _authorizationPermissions.sublist(0, 1),
-  );
+  List<HealthDataType> get _platformAuthorizationTypes => Platform.isAndroid
+      ? [
+          ..._androidDailyReadTypes,
+          HealthDataType.WORKOUT,
+          HealthDataType.WORKOUT_ROUTE,
+        ]
+      : _authorizationTypes;
+
+  List<HealthDataAccess> get _platformAuthorizationPermissions =>
+      List<HealthDataAccess>.filled(
+        _platformAuthorizationTypes.length,
+        HealthDataAccess.READ,
+        growable: false,
+      );
 
   @override
   Future<HealthReadResult> readToday({
@@ -71,13 +83,16 @@ class HealthPluginRepository implements HealthRepository {
             ),
           );
         }
-        final hasPermissions = await _health
+        final hasMetricPermissions = await _health
             .hasPermissions(
-              _dailyReadTypes,
-              permissions: _authorizationPermissions.sublist(0, 4),
+              _platformDailyReadTypes,
+              permissions: _platformAuthorizationPermissions.sublist(
+                0,
+                _platformDailyReadTypes.length,
+              ),
             )
             .timeout(permissionTimeout);
-        if (hasPermissions == false) {
+        if (hasMetricPermissions != true) {
           return _rememberRead(
             HealthReadResult(
               status: HealthReadStatus.permissionDenied,
@@ -98,20 +113,51 @@ class HealthPluginRepository implements HealthRepository {
         localNow.month,
         localNow.day,
       );
+      final readTypes = <HealthDataType>[..._platformDailyReadTypes];
+      if (Platform.isAndroid) {
+        for (final type in [
+          HealthDataType.WORKOUT,
+          HealthDataType.WORKOUT_ROUTE,
+        ]) {
+          final granted = await _health
+              .hasPermissions([type], permissions: [HealthDataAccess.READ])
+              .timeout(permissionTimeout);
+          if (granted == true) readTypes.add(type);
+        }
+      }
       final points = await _health
           .getHealthDataFromTypes(
-            types: _dailyReadTypes,
+            types: readTypes,
             startTime: localStart,
             endTime: localNow,
           )
           .timeout(permissionTimeout);
-      final samples = points.map(_toSample).toList(growable: false);
+      final baseSamples = points
+          .where((point) => _platformDailyReadTypes.contains(point.type))
+          .map(_toSample)
+          .toList(growable: false);
+      final workouts = _toWorkouts(points);
+      final samples = [
+        ...baseSamples,
+        for (final workout in workouts)
+          HealthSample(
+            type: HealthMetricType.exerciseMinutes,
+            value: workout.durationSeconds / 60,
+            dateFrom: workout.startedAt,
+            dateTo: workout.endedAt,
+            sourceApp: 'Health Connect',
+            sourceDevice: 'Health Connect',
+            recordingMethod: HealthRecordingMethod.automatic,
+            sourceId: workout.externalId,
+          ),
+      ];
       return _rememberRead(
         HealthReadResult(
-          status: samples.isEmpty
+          status: samples.isEmpty && workouts.isEmpty
               ? HealthReadStatus.noData
               : HealthReadStatus.success,
           samples: samples,
+          workouts: workouts,
           lastSyncedAt: DateTime.now().toUtc(),
           sourcePlatform: _platformName,
           message: null,
@@ -171,7 +217,7 @@ class HealthPluginRepository implements HealthRepository {
         }
 
         final granted = <HealthMetricType>{};
-        for (final type in _authorizationTypes) {
+        for (final type in _platformAuthorizationTypes) {
           final has = await _health
               .hasPermissions([type], permissions: [HealthDataAccess.READ])
               .timeout(permissionTimeout);
@@ -230,8 +276,10 @@ class HealthPluginRepository implements HealthRepository {
   }
 
   @override
-  Future<bool> requestAllPermissions() =>
-      _requestPermissions(_authorizationTypes, _authorizationPermissions);
+  Future<bool> requestAllPermissions() => _requestPermissions(
+    _platformAuthorizationTypes,
+    _platformAuthorizationPermissions,
+  );
 
   Future<bool> _requestPermissions(
     List<HealthDataType> types,
@@ -281,7 +329,7 @@ class HealthPluginRepository implements HealthRepository {
       HealthReadStatus.sourceUnavailable => HealthSetupState.unavailable,
       HealthReadStatus.retryableFailure => HealthSetupState.retryable,
       _ when granted.isEmpty => HealthSetupState.notGranted,
-      _ when granted.length < _authorizationTypes.length =>
+      _ when granted.length < _platformAuthorizationTypes.length =>
         HealthSetupState.partial,
       _ => HealthSetupState.available,
     };
@@ -311,6 +359,7 @@ class HealthPluginRepository implements HealthRepository {
     return switch (type) {
       HealthDataType.STEPS => HealthMetricType.steps,
       HealthDataType.ACTIVE_ENERGY_BURNED => HealthMetricType.activeCalories,
+      HealthDataType.DISTANCE_DELTA => HealthMetricType.distance,
       HealthDataType.DISTANCE_WALKING_RUNNING => HealthMetricType.distance,
       HealthDataType.EXERCISE_TIME => HealthMetricType.exerciseMinutes,
       HealthDataType.WORKOUT => HealthMetricType.workouts,
@@ -337,5 +386,92 @@ class HealthPluginRepository implements HealthRepository {
         RecordingMethod.unknown => HealthRecordingMethod.unknown,
       },
     );
+  }
+
+  List<HealthWorkoutRecord> _toWorkouts(List<HealthDataPoint> points) {
+    final routesByWorkout = <String, List<HealthRoutePoint>>{};
+    for (final point in points.where(
+      (point) => point.type == HealthDataType.WORKOUT_ROUTE,
+    )) {
+      final value = point.value;
+      if (value is! WorkoutRouteHealthValue) continue;
+      final externalId = value.workoutUuid?.trim().isNotEmpty == true
+          ? value.workoutUuid!.trim()
+          : point.uuid;
+      if (externalId.isEmpty) continue;
+      routesByWorkout[externalId] = [
+        ...(routesByWorkout[externalId] ?? const []),
+        ...value.locations.map(
+          (location) => HealthRoutePoint(
+            timestamp: location.timestamp,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            altitude: location.altitude,
+            accuracy: location.horizontalAccuracy,
+            bearing: location.course,
+          ),
+        ),
+      ];
+    }
+
+    return points
+        .where((point) => point.type == HealthDataType.WORKOUT)
+        .map((point) {
+          final value = point.value;
+          final summary = point.workoutSummary;
+          final workoutValue = value is WorkoutHealthValue ? value : null;
+          final duration = point.dateTo.difference(point.dateFrom);
+          final durationSeconds = duration.inSeconds > 0
+              ? duration.inSeconds
+              : 1;
+          final distance = _workoutDistanceMeters(
+            workoutValue?.totalDistance ?? summary?.totalDistance,
+            workoutValue?.totalDistanceUnit,
+          );
+          final calories = _workoutCalories(
+            workoutValue?.totalEnergyBurned ?? summary?.totalEnergyBurned,
+            workoutValue?.totalEnergyBurnedUnit,
+          );
+          final externalId = point.uuid.isNotEmpty
+              ? point.uuid
+              : '${point.sourceId}:${point.dateFrom.toUtc().toIso8601String()}';
+          return HealthWorkoutRecord(
+            externalId: externalId,
+            workoutType:
+                (workoutValue?.workoutActivityType.name ??
+                        summary?.workoutType ??
+                        'workout')
+                    .toLowerCase(),
+            startedAt: point.dateFrom,
+            endedAt: point.dateTo,
+            durationSeconds: durationSeconds,
+            distanceMeters: distance,
+            activeCalories: calories,
+            avgSpeed: distance == null ? null : distance / durationSeconds,
+            routePoints: routesByWorkout[externalId] ?? const [],
+          );
+        })
+        .toList(growable: false);
+  }
+
+  double? _workoutDistanceMeters(num? value, HealthDataUnit? unit) {
+    if (value == null) return null;
+    final amount = value.toDouble();
+    return switch (unit) {
+      HealthDataUnit.MILE => amount * 1609.344,
+      HealthDataUnit.FOOT => amount * 0.3048,
+      HealthDataUnit.YARD => amount * 0.9144,
+      _ => amount,
+    };
+  }
+
+  double? _workoutCalories(num? value, HealthDataUnit? unit) {
+    if (value == null) return null;
+    final amount = value.toDouble();
+    return switch (unit) {
+      HealthDataUnit.JOULE => amount / 4184,
+      HealthDataUnit.SMALL_CALORIE => amount / 1000,
+      _ => amount,
+    };
   }
 }

@@ -33,4 +33,31 @@ class SupabaseWorkoutRouteRepository {
         })
         .toList(growable: false);
   }
+
+  Future<void> replaceRoute({
+    required String workoutId,
+    required List<RoutePoint> points,
+  }) async {
+    await _client
+        .from('workout_route_points')
+        .delete()
+        .eq('workout_id', workoutId);
+    if (points.isEmpty) return;
+    const chunkSize = 500;
+    for (var start = 0; start < points.length; start += chunkSize) {
+      final chunk = points.skip(start).take(chunkSize);
+      await _client.from('workout_route_points').insert([
+        for (final point in chunk)
+          {
+            'workout_id': workoutId,
+            'timestamp': point.timestamp.toUtc().toIso8601String(),
+            'latitude': point.latitude,
+            'longitude': point.longitude,
+            'altitude': point.altitude,
+            'accuracy': point.accuracy,
+            'bearing': point.bearing,
+          },
+      ]);
+    }
+  }
 }

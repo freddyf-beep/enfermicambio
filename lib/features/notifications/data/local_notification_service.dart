@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// Abstraction over OS-level notification delivery. The production
 /// implementation uses local notifications; a future FCM slice will add a
@@ -36,6 +37,10 @@ class FlutterLocalNotificationService implements LocalNotificationService {
     );
     try {
       await _plugin.initialize(settings);
+      if (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS) {
+        await Permission.notification.request();
+      }
       _initialized = true;
     } on Exception {
       // Platform channel unavailable (e.g. desktop tests): stay silent.
@@ -53,7 +58,8 @@ class FlutterLocalNotificationService implements LocalNotificationService {
       android: AndroidNotificationDetails(
         'competencia',
         'Competencia',
-        channelDescription: 'Adelantamientos, rondas, logros y novedades '
+        channelDescription:
+            'Adelantamientos, rondas, logros y novedades '
             'de la competencia.',
         importance: Importance.high,
         priority: Priority.high,

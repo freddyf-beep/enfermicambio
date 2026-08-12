@@ -28,6 +28,7 @@ class HealthSyncService {
         readStatus: read.status,
         aggregate: null,
         message: read.message,
+        workouts: read.workouts,
       );
     }
 
@@ -52,7 +53,11 @@ class HealthSyncService {
       },
     );
     await _sink.upsert(aggregate);
-    return HealthSyncResult(readStatus: read.status, aggregate: aggregate);
+    return HealthSyncResult(
+      readStatus: read.status,
+      aggregate: aggregate,
+      workouts: read.workouts,
+    );
   }
 
   DateTime _localDate(DateTime currentTime) {
@@ -75,9 +80,11 @@ class HealthSyncResult {
     required this.readStatus,
     required this.aggregate,
     this.message,
+    this.workouts = const [],
   });
 
   final HealthReadStatus readStatus;
   final DailyActivityAggregate? aggregate;
   final String? message;
+  final List<HealthWorkoutRecord> workouts;
 }

@@ -9,6 +9,7 @@ class HealthPermissionSetting {
     required this.metric,
     this.granted = false,
     this.supported = true,
+    this.isDerived = false,
   });
 
   final String id;
@@ -20,6 +21,10 @@ class HealthPermissionSetting {
   /// permission state (currently Apple HealthKit).
   final bool? granted;
   final bool supported;
+
+  /// True when the value is calculated from another permission rather than a
+  /// platform health type (Android exercise minutes come from workouts).
+  final bool isDerived;
 }
 
 /// Snapshot of all health permission state plus a platform-aware health

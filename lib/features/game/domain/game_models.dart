@@ -41,13 +41,13 @@ class Mission {
   });
 
   factory Mission.fromJson(Map<String, dynamic> json) => Mission(
-        id: json['id'] as String,
-        name: (json['name'] as String?) ?? 'Misión',
-        description: (json['description'] as String?) ?? '',
-        missionType: (json['mission_type'] as String?) ?? 'individual',
-        rules: (json['rules'] as Map<String, dynamic>?) ?? const {},
-        rewardPoints: ((json['reward_points'] as num?) ?? 0).toInt(),
-      );
+    id: json['id'] as String,
+    name: (json['name'] as String?) ?? 'Misión',
+    description: (json['description'] as String?) ?? '',
+    missionType: (json['mission_type'] as String?) ?? 'individual',
+    rules: (json['rules'] as Map<String, dynamic>?) ?? const {},
+    rewardPoints: ((json['reward_points'] as num?) ?? 0).toInt(),
+  );
 
   final String id;
   final String name;
@@ -67,7 +67,8 @@ class MissionProgress {
     this.completedAt,
   });
 
-  factory MissionProgress.fromJson(Map<String, dynamic> json) => MissionProgress(
+  factory MissionProgress.fromJson(Map<String, dynamic> json) =>
+      MissionProgress(
         missionId: json['mission_id'] as String,
         userId: json['user_id'] as String?,
         progressDate: json['progress_date'] as String?,
@@ -99,13 +100,13 @@ class Achievement {
   });
 
   factory Achievement.fromJson(Map<String, dynamic> json) => Achievement(
-        id: json['id'] as String,
-        code: (json['code'] as String?) ?? '',
-        name: (json['name'] as String?) ?? 'Logro',
-        description: (json['description'] as String?) ?? '',
-        icon: (json['icon'] as String?) ?? 'military_tech',
-        hidden: (json['hidden'] as bool?) ?? false,
-      );
+    id: json['id'] as String,
+    code: (json['code'] as String?) ?? '',
+    name: (json['name'] as String?) ?? 'Logro',
+    description: (json['description'] as String?) ?? '',
+    icon: (json['icon'] as String?) ?? 'military_tech',
+    hidden: (json['hidden'] as bool?) ?? false,
+  );
 
   final String id;
   final String code;
@@ -116,9 +117,13 @@ class Achievement {
 }
 
 class UserAchievement {
-  const UserAchievement({required this.achievementId, required this.unlockedAt});
+  const UserAchievement({
+    required this.achievementId,
+    required this.unlockedAt,
+  });
 
-  factory UserAchievement.fromJson(Map<String, dynamic> json) => UserAchievement(
+  factory UserAchievement.fromJson(Map<String, dynamic> json) =>
+      UserAchievement(
         achievementId: json['achievement_id'] as String,
         unlockedAt: DateTime.parse(json['unlocked_at'] as String),
       );
@@ -136,13 +141,13 @@ class Streak {
   });
 
   factory Streak.fromJson(Map<String, dynamic> json) => Streak(
-        streakType: (json['streak_type'] as String?) ?? '',
-        currentCount: ((json['current_count'] as num?) ?? 0).toInt(),
-        longestCount: ((json['longest_count'] as num?) ?? 0).toInt(),
-        lastQualifiedDate: json['last_qualified_date'] == null
-            ? null
-            : DateTime.parse(json['last_qualified_date'] as String),
-      );
+    streakType: (json['streak_type'] as String?) ?? '',
+    currentCount: ((json['current_count'] as num?) ?? 0).toInt(),
+    longestCount: ((json['longest_count'] as num?) ?? 0).toInt(),
+    lastQualifiedDate: json['last_qualified_date'] == null
+        ? null
+        : DateTime.parse(json['last_qualified_date'] as String),
+  );
 
   final String streakType;
   final int currentCount;
@@ -161,13 +166,13 @@ class BattlePassTier {
   });
 
   factory BattlePassTier.fromJson(Map<String, dynamic> json) => BattlePassTier(
-        tier: ((json['tier'] as num?) ?? 0).toInt(),
-        thresholdPoints: ((json['threshold_points'] as num?) ?? 0).toInt(),
-        rewardType: (json['reward_type'] as String?) ?? 'badge',
-        rewardKey: (json['reward_key'] as String?) ?? '',
-        rewardName: (json['reward_name'] as String?) ?? '',
-        rewardIcon: (json['reward_icon'] as String?) ?? 'military_tech',
-      );
+    tier: ((json['tier'] as num?) ?? 0).toInt(),
+    thresholdPoints: ((json['threshold_points'] as num?) ?? 0).toInt(),
+    rewardType: (json['reward_type'] as String?) ?? 'badge',
+    rewardKey: (json['reward_key'] as String?) ?? '',
+    rewardName: (json['reward_name'] as String?) ?? '',
+    rewardIcon: (json['reward_icon'] as String?) ?? 'military_tech',
+  );
 
   final int tier;
   final int thresholdPoints;
@@ -180,7 +185,8 @@ class BattlePassTier {
 class BattlePassClaim {
   const BattlePassClaim({required this.tier, required this.claimedAt});
 
-  factory BattlePassClaim.fromJson(Map<String, dynamic> json) => BattlePassClaim(
+  factory BattlePassClaim.fromJson(Map<String, dynamic> json) =>
+      BattlePassClaim(
         tier: ((json['tier'] as num?) ?? 0).toInt(),
         claimedAt: DateTime.parse(json['claimed_at'] as String),
       );
@@ -200,15 +206,15 @@ class SeasonResult {
   });
 
   factory SeasonResult.fromJson(Map<String, dynamic> json) => SeasonResult(
-        seasonId: json['season_id'] as String,
-        seasonName: (json['season_name'] as String?) ?? 'Temporada',
-        position: ((json['position'] as num?) ?? 0).toInt(),
-        points: ((json['points'] as num?) ?? 0).toDouble(),
-        userId: json['user_id'] as String?,
-        displayName: (json['display_name'] as String?) ??
-            (json['profiles'] as Map<String, dynamic>?)?['display_name']
-                as String?,
-      );
+    seasonId: json['season_id'] as String,
+    seasonName: (json['season_name'] as String?) ?? 'Temporada',
+    position: ((json['position'] as num?) ?? 0).toInt(),
+    points: ((json['points'] as num?) ?? 0).toDouble(),
+    userId: json['user_id'] as String?,
+    displayName:
+        (json['display_name'] as String?) ??
+        (json['profiles'] as Map<String, dynamic>?)?['display_name'] as String?,
+  );
 
   final String seasonId;
   final String seasonName;
@@ -226,10 +232,10 @@ class SeasonKm {
   });
 
   factory SeasonKm.fromJson(Map<String, dynamic> json) => SeasonKm(
-        userId: json['user_id'] as String,
-        displayName: (json['display_name'] as String?) ?? 'Desconocido',
-        km: ((json['km'] as num?) ?? 0).toDouble(),
-      );
+    userId: json['user_id'] as String,
+    displayName: (json['display_name'] as String?) ?? 'Desconocido',
+    km: ((json['km'] as num?) ?? 0).toDouble(),
+  );
 
   final String userId;
   final String displayName;

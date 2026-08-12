@@ -1,11 +1,13 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:timezone/timezone.dart' as tz;
 
+import '../../../shared/config/app_environment.dart';
 import '../domain/ranking_models.dart';
 
 /// Carga rankings reales por categoría y período desde Supabase.
 /// Siempre se muestran los 4 perfiles; quien no tenga datos aparece con cero.
 class RankingRepository {
-  RankingRepository({required SupabaseClient client}) : _client = client;
+  RankingRepository({required this._client});
 
   final SupabaseClient _client;
 
@@ -14,12 +16,25 @@ class RankingRepository {
     required RankingTimePeriod period,
     required DateTime now,
   }) async {
+    final location = tz.getLocation(AppEnvironment.competitionTimezone);
     final profiles = await _client
         .from('profiles')
         .select('id, display_name, avatar_url');
     final users = profiles.cast<Map<String, dynamic>>().toList();
 
     final (start, end) = await _rangeFor(period, now);
+    final competitionLocation = tz.getLocation(
+      AppEnvironment.competitionTimezone,
+    );
+    // `_rangeFor` returns inclusive competition dates. Timestamp-backed
+    // tables need the following midnight as an exclusive upper bound, or a
+    // workout/point recorded later on the end date is silently omitted.
+    final endExclusive = tz.TZDateTime(
+      competitionLocation,
+      end.year,
+      end.month,
+      end.day + 1,
+    );
     final activity = await _client
         .from('daily_activity')
         .select(
@@ -32,27 +47,28 @@ class RankingRepository {
 
     final workouts = (category == RankingCategory.entrenamientos)
         ? await _client
-            .from('workouts')
-            .select('user_id')
-            .gte('started_at', start.toUtc().toIso8601String())
-            .lte('started_at', end.toUtc().toIso8601String())
+              .from('workouts')
+              .select('user_id')
+              .gte('started_at', start.toUtc().toIso8601String())
+              .lt('started_at', endExclusive.toUtc().toIso8601String())
         : null;
 
     final seasonStandings =
         (category == RankingCategory.puntos &&
             period == RankingTimePeriod.temporada)
-            ? await _client
-                .from('season_standings')
-                .select('user_id, total_points, position')
-            : null;
+        ? await _client
+              .from('season_standings')
+              .select('user_id, total_points, position')
+        : null;
 
-    final pointsRows = (category == RankingCategory.puntos &&
+    final pointsRows =
+        (category == RankingCategory.puntos &&
             period != RankingTimePeriod.temporada)
         ? await _client
-            .from('season_points')
-            .select('user_id, points, created_at')
-            .gte('created_at', start.toUtc().toIso8601String())
-            .lte('created_at', end.toUtc().toIso8601String())
+              .from('season_points')
+              .select('user_id, points, created_at')
+              .gte('created_at', start.toUtc().toIso8601String())
+              .lt('created_at', endExclusive.toUtc().toIso8601String())
         : null;
 
     final values = <String, double>{};
@@ -64,7 +80,10 @@ class RankingRepository {
       if (current == null || s.isAfter(current)) synced[userId] = s;
       final metric = switch (category) {
         RankingCategory.pasos => (row['daily_steps'] as num).toDouble(),
-        RankingCategory.franjas => _windowSteps(row, now),
+        RankingCategory.franjas => _windowSteps(
+          row,
+          tz.TZDateTime.from(now.toUtc(), location),
+        ),
         RankingCategory.distancia =>
           (row['distance_meters'] as num?)?.toDouble() ?? 0,
         RankingCategory.entrenamientos => 0,
@@ -83,8 +102,8 @@ class RankingRepository {
     }
     if (seasonStandings != null) {
       for (final row in seasonStandings.cast<Map<String, dynamic>>()) {
-        values[row['user_id'] as String] =
-            ((row['total_points'] as num?) ?? 0).toDouble();
+        values[row['user_id'] as String] = ((row['total_points'] as num?) ?? 0)
+            .toDouble();
       }
     }
     if (pointsRows != null) {
@@ -139,7 +158,14 @@ class RankingRepository {
     RankingTimePeriod period,
     DateTime now,
   ) async {
-    final today = DateTime(now.year, now.month, now.day);
+    final location = tz.getLocation(AppEnvironment.competitionTimezone);
+    final localNow = tz.TZDateTime.from(now.toUtc(), location);
+    final today = tz.TZDateTime(
+      location,
+      localNow.year,
+      localNow.month,
+      localNow.day,
+    );
     switch (period) {
       case RankingTimePeriod.hoy:
         return (today, today);
@@ -154,18 +180,23 @@ class RankingRepository {
             .order('starts_at', ascending: false)
             .limit(1);
         if (rows.isEmpty) return (today, today);
-        final startsAt =
-            DateTime.parse(rows.first['starts_at'] as String).toLocal();
-        final endsAt =
-            DateTime.parse(rows.first['ends_at'] as String).toLocal();
+        final startsAt = tz.TZDateTime.from(
+          DateTime.parse(rows.first['starts_at'] as String).toUtc(),
+          location,
+        );
+        final endsAt = tz.TZDateTime.from(
+          DateTime.parse(rows.first['ends_at'] as String).toUtc(),
+          location,
+        );
         return (
-          DateTime(startsAt.year, startsAt.month, startsAt.day),
-          DateTime(endsAt.year, endsAt.month, endsAt.day),
+          tz.TZDateTime(location, startsAt.year, startsAt.month, startsAt.day),
+          tz.TZDateTime(location, endsAt.year, endsAt.month, endsAt.day),
         );
     }
   }
 
-  String _date(DateTime d) => '${d.year.toString().padLeft(4, '0')}-'
+  String _date(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
       '${d.month.toString().padLeft(2, '0')}-'
       '${d.day.toString().padLeft(2, '0')}';
 }

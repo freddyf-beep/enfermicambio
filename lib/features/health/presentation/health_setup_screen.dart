@@ -405,7 +405,7 @@ class _PlatformCard extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: Text(
-          '${_labelFor(snapshot.state)}${snapshot.platform == 'android' && snapshot.healthAvailable ? ' · ${snapshot.grantedTypes.length} de 6 grupos' : ''}',
+          '${_labelFor(snapshot.state)}${snapshot.platform == 'android' && snapshot.healthAvailable ? ' · ${snapshot.grantedTypes.length} de 5 permisos' : ''}',
         ),
       ),
     );
@@ -435,7 +435,9 @@ class _PermissionList extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
               leading: Icon(
-                setting.granted == true
+                setting.isDerived
+                    ? Icons.auto_graph_outlined
+                    : setting.granted == true
                     ? Icons.check_circle_outline
                     : setting.granted == false
                     ? Icons.radio_button_unchecked
@@ -504,10 +506,15 @@ class _PermissionList extends StatelessWidget {
       HealthPermissionSetting(
         id: 'exercise_minutes',
         title: 'Minutos de ejercicio',
-        description: 'Tiempo acumulado de entrenamiento activo.',
+        description: snapshot.platform == 'android'
+            ? 'Se calcula a partir de la duración de tus entrenamientos.'
+            : 'Tiempo acumulado de entrenamiento activo.',
         metric: HealthMetricType.exerciseMinutes,
+        isDerived: snapshot.platform == 'android',
         granted: iOSReadStateIsPrivate
             ? null
+            : snapshot.platform == 'android'
+            ? granted.contains(HealthMetricType.workouts)
             : granted.contains(HealthMetricType.exerciseMinutes),
         supported: snapshot.healthAvailable,
       ),
@@ -539,6 +546,9 @@ class _PermissionList extends StatelessWidget {
     HealthPermissionSetting setting,
   ) {
     if (!setting.supported) return 'No disponible';
+    if (setting.isDerived) {
+      return setting.granted == true ? 'Derivado' : 'Depende de entrenamientos';
+    }
     if (setting.granted == true) return 'Concedido';
     if (setting.granted == false) return 'Falta';
     if (snapshot.state == HealthSetupState.connected) {

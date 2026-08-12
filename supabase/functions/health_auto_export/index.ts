@@ -43,7 +43,10 @@ const METRIC_KINDS = new Map<string, MetricKind>([
   ["activeenergyburned", "calories"],
   ["active_calories", "calories"],
   ["walking_running_distance", "distance"],
+  ["walking_+_running_distance", "distance"],
+  ["walking_&_running_distance", "distance"],
   ["distance_walking_running", "distance"],
+  ["distance_walking_+_running", "distance"],
   ["walkingrunningdistance", "distance"],
   ["apple_exercise_time", "exercise"],
   ["exercise_time", "exercise"],
@@ -435,7 +438,9 @@ async function importMetrics(
     source_app: "Health Auto Export",
     source_device: row.device ?? "Apple Health",
     recording_method: row.manualEntryDetected ? "mixed" : "automatic",
-    manual_entry_detected: false,
+    // Manual samples are skipped from the totals, but the flag remains true
+    // so rankings and season totals can exclude a mixed/contaminated day.
+    manual_entry_detected: row.manualEntryDetected,
     source_metadata: {
       bridge: SOURCE,
       raw_payload_stored: false,
@@ -562,6 +567,7 @@ async function refreshGamification(
   admin: AdminClient,
   userId: string,
   dates: string[],
+  bridgeToken: string,
 ): Promise<string[]> {
   const warnings: string[] = [];
   for (const date of dates) {
@@ -570,6 +576,32 @@ async function refreshGamification(
       p_date: date,
     });
     if (achievementError) warnings.push("achievements not refreshed");
+
+    // The bridge token is also accepted by generate_events for this exact
+    // per-user flow. This keeps step milestones, overtakes and leader-change
+    // notifications in the same server-authoritative pipeline as the health
+    // upsert, without exposing another client credential.
+    const projectUrl = Deno.env.get("SUPABASE_URL");
+    if (!projectUrl) {
+      warnings.push("events not refreshed");
+      continue;
+    }
+    try {
+      const response = await fetch(
+        `${projectUrl}/functions/v1/generate_events`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${bridgeToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ user_id: userId, date }),
+        },
+      );
+      if (!response.ok) warnings.push("events not refreshed");
+    } catch {
+      warnings.push("events not refreshed");
+    }
   }
   return [...new Set(warnings)];
 }
@@ -637,7 +669,12 @@ async function handle(admin: AdminClient, req: Request): Promise<Response> {
   stage = "workouts";
   const workoutResult = await importWorkouts(admin, userId, payload);
   stage = "achievements";
-  const warnings = await refreshGamification(admin, userId, metricResult.rows);
+  const warnings = await refreshGamification(
+    admin,
+    userId,
+    metricResult.rows,
+    token,
+  );
 
   stage = "token_last_used";
   await admin

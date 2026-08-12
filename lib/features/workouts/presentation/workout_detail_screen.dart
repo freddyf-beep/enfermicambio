@@ -81,9 +81,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
       );
     } on Exception catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo publicar: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('No se pudo publicar: $error')));
     } finally {
       if (mounted) {
         setState(() {
@@ -122,10 +122,14 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppColors.fitnessGreen.withOpacity(0.15),
+                        color: AppColors.fitnessGreen.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.directions_run, color: AppColors.fitnessGreen, size: 28),
+                      child: const Icon(
+                        Icons.directions_run,
+                        color: AppColors.fitnessGreen,
+                        size: 28,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Column(
@@ -133,12 +137,16 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                       children: [
                         Text(
                           _typeLabel(workout.workoutType),
-                          style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         Text(
                           '${workout.startedAt.day}/${workout.startedAt.month} ${workout.startedAt.hour}:${workout.startedAt.minute.toString().padLeft(2, '0')}',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
                               ),
                         ),
                       ],
@@ -149,7 +157,10 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                 _StatsGrid(workout: workout),
                 const SizedBox(height: 20),
                 if (workout.routeAvailable) ...[
-                  const Text('Ruta del Recorrido', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text(
+                    'Ruta del Recorrido',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                   const SizedBox(height: 8),
                   RouteMapView(points: _route ?? const []),
                   const SizedBox(height: 20),
@@ -157,7 +168,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                 FilledButton.icon(
                   onPressed: _publishing ? null : _publishToFeed,
                   icon: const Icon(Icons.public),
-                  label: Text(_publishing ? 'Publicando...' : 'Publicar en el Feed'),
+                  label: Text(
+                    _publishing ? 'Publicando...' : 'Publicar en el Feed',
+                  ),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
@@ -181,15 +194,27 @@ class _StatsGrid extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: _Stat(label: 'Distancia', value: '${km.toStringAsFixed(2)} km', color: AppColors.fitnessGreen),
+          child: _Stat(
+            label: 'Distancia',
+            value: '${km.toStringAsFixed(2)} km',
+            color: AppColors.fitnessGreen,
+          ),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _Stat(label: 'Duración', value: '$minutes min', color: AppColors.primaryLight),
+          child: _Stat(
+            label: 'Duración',
+            value: '$minutes min',
+            color: AppColors.primaryLight,
+          ),
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _Stat(label: 'Calorías', value: '${kcal.round()} kcal', color: AppColors.streakOrange),
+          child: _Stat(
+            label: 'Calorías',
+            value: '${kcal.round()} kcal',
+            color: AppColors.streakOrange,
+          ),
         ),
       ],
     );
@@ -212,14 +237,18 @@ class _Stat extends StatelessWidget {
           children: [
             Text(
               value,
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: color),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: color,
+              ),
             ),
             const SizedBox(height: 4),
             Text(
               label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),

@@ -1,4 +1,6 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:timezone/data/latest.dart' as timezone_data;
+import 'package:timezone/timezone.dart' as tz;
 
 /// Resolves app configuration with a safe fallback chain:
 ///   1. --dart-define values (used in release builds via CI)
@@ -32,13 +34,18 @@ class AppEnvironment {
       supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
 
   /// Fecha de competencia de hoy como 'yyyy-MM-dd'. Los 4 dispositivos del
-  /// grupo corren en la zona de competencia (America/Santiago), por lo que la
-  /// fecha local del host es la fecha de competencia.
+  /// grupo usan la zona de competencia, aunque el dispositivo o el host estén
+  /// configurados con otra zona horaria.
   static String todayInCompetitionTz() {
-    final now = DateTime.now().toLocal();
-    return '${now.year.toString().padLeft(4, '0')}-'
-        '${now.month.toString().padLeft(2, '0')}-'
-        '${now.day.toString().padLeft(2, '0')}';
+    timezone_data.initializeTimeZones();
+    final now = tz.TZDateTime.now(tz.getLocation(competitionTimezone));
+    return _dateOnly(now);
+  }
+
+  static String _dateOnly(DateTime value) {
+    return '${value.year.toString().padLeft(4, '0')}-'
+        '${value.month.toString().padLeft(2, '0')}-'
+        '${value.day.toString().padLeft(2, '0')}';
   }
 
   static String _firstNonEmpty(String primary, String fallback) {

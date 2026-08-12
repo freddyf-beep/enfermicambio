@@ -64,4 +64,39 @@ class NutritionService {
       loggedAt: loggedAt,
     );
   }
+
+  /// Creates a snapshot from a number of base servings rather than treating
+  /// the number of servings as a gram/millilitre quantity.
+  FoodEntry entryFromServings({
+    required Food food,
+    required double servings,
+    required MealType mealType,
+    required DateTime loggedAt,
+    String? photoUrl,
+  }) {
+    if (servings <= 0) {
+      throw ArgumentError.value(servings, 'servings', 'must be positive');
+    }
+    final quantity = food.servingSize * servings;
+    final entry = entryFromFood(
+      food: food,
+      quantity: quantity,
+      mealType: mealType,
+      loggedAt: loggedAt,
+    );
+    return FoodEntry(
+      id: entry.id,
+      foodId: entry.foodId,
+      foodName: entry.foodName,
+      mealType: entry.mealType,
+      quantity: entry.quantity,
+      unit: entry.unit,
+      calories: entry.calories,
+      proteinG: entry.proteinG,
+      carbsG: entry.carbsG,
+      fatG: entry.fatG,
+      loggedAt: entry.loggedAt,
+      photoUrl: photoUrl,
+    );
+  }
 }

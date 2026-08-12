@@ -99,99 +99,106 @@ void main() {
       expect(find.text('Pase de Batalla'), findsOneWidget);
       expect(find.text('Iniciado del mes'), findsOneWidget);
 
-      await tester.scrollUntilVisible(find.text('Club 5K'), 300,
-          scrollable: find.byType(Scrollable).first);
+      await tester.scrollUntilVisible(
+        find.text('Club 5K'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Club 5K'), findsOneWidget);
       expect(find.text('Piernas de maratón'), findsOneWidget);
 
-      await tester.scrollUntilVisible(find.textContaining('3 días seguidos'), 300,
-          scrollable: find.byType(Scrollable).first);
+      await tester.scrollUntilVisible(
+        find.textContaining('3 días seguidos'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.textContaining('3 días seguidos'), findsOneWidget);
 
-      await tester.scrollUntilVisible(find.textContaining('42.5'), 300,
-          scrollable: find.byType(Scrollable).first);
+      await tester.scrollUntilVisible(
+        find.textContaining('42.5'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.textContaining('42.5'), findsOneWidget);
     });
   });
 }
 
 GameSnapshot buildSnapshot() => const GameSnapshot(
-      seasonName: 'Temporada Agosto 2026',
-      seasonStatus: 'active',
-      standings: [
-        SeasonStanding(
-          seasonId: 's1',
-          userId: 'u1',
-          displayName: 'Freddy',
-          totalPoints: 120,
-          position: 1,
-        ),
-        SeasonStanding(
-          seasonId: 's1',
-          userId: 'u2',
-          displayName: 'Felipe',
-          totalPoints: 90,
-          position: 2,
-        ),
-      ],
-      missions: [
-        Mission(
-          id: 'm1',
-          name: 'Madrugador',
-          description: '2.500 pasos antes del mediodía',
-          missionType: 'individual',
-          rules: {'metric': 'morning_steps', 'target': 2500},
-          rewardPoints: 10,
-        ),
-      ],
-      missionProgress: {
-        'm1': MissionProgress(
-          missionId: 'm1',
-          progressDate: '2026-08-11',
-          progress: {'morning_steps': 1250},
-          completed: false,
-        ),
-      },
-      achievements: [
-        Achievement(
-          id: 'a1',
-          code: '5K_CLUB',
-          name: 'Club 5K',
-          description: '5.000 pasos en un día',
-          icon: 'directions_walk',
-          hidden: false,
-        ),
-        Achievement(
-          id: 'a2',
-          code: 'MARATHON_LEGS',
-          name: 'Piernas de maratón',
-          description: '25.000 pasos en un día',
-          icon: 'directions_run',
-          hidden: false,
-        ),
-        Achievement(
-          id: 'a3',
-          code: 'SECRETA',
-          name: 'Logro secreto',
-          description: 'Solo se ve al desbloquearlo',
-          icon: 'lock',
-          hidden: true,
-        ),
-      ],
-      unlockedAchievements: {'a1'},
-      streaks: [
-        Streak(streakType: 'step_goal', currentCount: 3, longestCount: 7),
-      ],
-      battlePassTiers: [
-        BattlePassTier(
-          tier: 1,
-          thresholdPoints: 10,
-          rewardType: 'badge',
-          rewardKey: 'badge_1',
-          rewardName: 'Iniciado del mes',
-          rewardIcon: 'military_tech',
-        ),
-      ],
-      battlePassClaims: {1},
-      seasonKm: [SeasonKm(userId: 'u1', displayName: 'Freddy', km: 42.5)],
-    );
+  seasonName: 'Temporada Agosto 2026',
+  seasonStatus: 'active',
+  standings: [
+    SeasonStanding(
+      seasonId: 's1',
+      userId: 'u1',
+      displayName: 'Freddy',
+      totalPoints: 120,
+      position: 1,
+    ),
+    SeasonStanding(
+      seasonId: 's1',
+      userId: 'u2',
+      displayName: 'Felipe',
+      totalPoints: 90,
+      position: 2,
+    ),
+  ],
+  missions: [
+    Mission(
+      id: 'm1',
+      name: 'Madrugador',
+      description: '2.500 pasos antes del mediodía',
+      missionType: 'individual',
+      rules: {'metric': 'morning_steps', 'target': 2500},
+      rewardPoints: 10,
+    ),
+  ],
+  missionProgress: {
+    'm1': MissionProgress(
+      missionId: 'm1',
+      progressDate: '2026-08-11',
+      progress: {'morning_steps': 1250},
+      completed: false,
+    ),
+  },
+  achievements: [
+    Achievement(
+      id: 'a1',
+      code: '5K_CLUB',
+      name: 'Club 5K',
+      description: '5.000 pasos en un día',
+      icon: 'directions_walk',
+      hidden: false,
+    ),
+    Achievement(
+      id: 'a2',
+      code: 'MARATHON_LEGS',
+      name: 'Piernas de maratón',
+      description: '25.000 pasos en un día',
+      icon: 'directions_run',
+      hidden: false,
+    ),
+    Achievement(
+      id: 'a3',
+      code: 'SECRETA',
+      name: 'Logro secreto',
+      description: 'Solo se ve al desbloquearlo',
+      icon: 'lock',
+      hidden: true,
+    ),
+  ],
+  unlockedAchievements: {'a1'},
+  streaks: [Streak(streakType: 'step_goal', currentCount: 3, longestCount: 7)],
+  battlePassTiers: [
+    BattlePassTier(
+      tier: 1,
+      thresholdPoints: 10,
+      rewardType: 'badge',
+      rewardKey: 'badge_1',
+      rewardName: 'Iniciado del mes',
+      rewardIcon: 'military_tech',
+    ),
+  ],
+  battlePassClaims: {1},
+  seasonKm: [SeasonKm(userId: 'u1', displayName: 'Freddy', km: 42.5)],
+);

@@ -1,6 +1,6 @@
-import '../../lib/features/profiles/domain/profile_models.dart';
-import '../../lib/features/ranking/domain/ranking_models.dart';
-import '../../lib/features/game/domain/game_models.dart';
+import 'package:enfermicambio/features/profiles/domain/profile_models.dart';
+import 'package:enfermicambio/features/ranking/domain/ranking_models.dart';
+import 'package:enfermicambio/features/game/domain/game_models.dart';
 
 class UserMocks {
   static const String idFreddy = 'user-freddy-001';

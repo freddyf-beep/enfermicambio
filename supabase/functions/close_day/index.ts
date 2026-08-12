@@ -184,7 +184,8 @@ async function handle(
     if (achErr) throw new Error(`achievement evaluation failed: ${achErr.message}`);
   }
 
-  // Publish the daily result post.
+  // Publish the daily result post once. The scheduled job is safe to retry;
+  // the same idempotency marker prevents feed duplication.
   const winnerId = rows.length > 0 ? rows[0].user_id : null;
   let winnerName = "No one";
   if (winnerId) {
@@ -196,14 +197,27 @@ async function handle(
     winnerName = winner?.display_name ?? "Someone";
   }
   const dayLabel = competitionDate;
-  await supabaseAdmin.from("posts").insert({
-    author_id: winnerId ?? profiles?.[0]?.id,
-    post_type: "round_result",
-    caption:
-      `Daily result for ${dayLabel}: ${winnerName} takes the day` +
-      (rows.length > 0 ? ` with ${rows[0].daily_steps} steps.` : "."),
-    system_generated: true,
-  });
+  const postMarker = `day:${dayLabel}`;
+  const { data: existingPost, error: existingPostError } = await supabaseAdmin
+    .from("posts")
+    .select("id")
+    .eq("post_type", "round_result")
+    .eq("system_generated", true)
+    .ilike("caption", `%${postMarker}%`)
+    .limit(1)
+    .maybeSingle();
+  if (existingPostError) throw new Error(`daily post lookup failed: ${existingPostError.message}`);
+  if (!existingPost) {
+    await supabaseAdmin.from("posts").insert({
+      author_id: winnerId ?? profiles?.[0]?.id,
+      post_type: "round_result",
+      caption:
+        `Daily result for ${dayLabel}: ${winnerName} takes the day` +
+        (rows.length > 0 ? ` with ${rows[0].daily_steps} steps. ` : ". ") +
+        `[${postMarker}]`,
+      system_generated: true,
+    });
+  }
 
   // Notify all four users about the daily result (idempotent per key).
   const notifKey = `daily_result:${competitionDate}`;

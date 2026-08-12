@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -15,6 +16,7 @@ import '../../health/data/health_plugin_repository.dart';
 import '../../health/domain/health_models.dart';
 import '../../health/presentation/health_connection_card.dart';
 import '../../health/presentation/health_setup_screen.dart';
+import '../../health/presentation/health_auto_export_setup_screen.dart';
 import '../../ranking/domain/ranking_models.dart';
 import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
@@ -73,19 +75,31 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   void _subscribeRealtime() {
-    _realtimeChannel = Supabase.instance.client
-        .channel('feed')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'posts',
-          callback: (_) {
-            if (mounted) {
-              _load();
-            }
-          },
-        )
-        .subscribe();
+    final channel = Supabase.instance.client.channel('feed');
+    void refresh(_) {
+      if (mounted) _load();
+    }
+
+    channel
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'posts',
+        callback: refresh,
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'comments',
+        callback: refresh,
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'reactions',
+        callback: refresh,
+      );
+    _realtimeChannel = channel.subscribe();
   }
 
   Future<void> _load() async {
@@ -117,7 +131,7 @@ class _HomeTabState extends State<HomeTab> {
     final userId = Supabase.instance.client.auth.currentSession?.user.id;
     if (userId == null) return;
     try {
-      await _posts.addReaction(postId: post.id, userId: userId, emoji: '❤️');
+      await _posts.toggleReaction(postId: post.id, userId: userId, emoji: '❤️');
       await _load();
     } on Exception {
       if (mounted) {
@@ -175,6 +189,42 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _openHealthSetup() async {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      final refresh = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Configurar puente de salud'),
+          content: const Text(
+            'En iPhone los datos llegan desde Health Auto Export. '
+            'Abre su automatización EnfermiCambio, pulsa Actualizar o ejecútala '
+            'manualmente y vuelve aquí para refrescar el resumen.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cerrar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const HealthAutoExportSetupScreen(),
+                  ),
+                );
+                if (mounted) await _load();
+              },
+              child: const Text('Configurar puente'),
+            ),
+          ],
+        ),
+      );
+      if (refresh == true && mounted) {
+        await _load();
+      }
+      return;
+    }
+
     await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => HealthSetupScreen(
@@ -188,6 +238,13 @@ class _HomeTabState extends State<HomeTab> {
     if (mounted) {
       await _load();
     }
+  }
+
+  Future<void> _openHealthAutoExportSetup() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const HealthAutoExportSetupScreen()),
+    );
+    if (mounted) await _load();
   }
 
   @override
@@ -257,7 +314,7 @@ class _HomeTabState extends State<HomeTab> {
             ],
             if (_status?.state == AsyncState.offline) ...[
               Card(
-                color: AppColors.streakOrange.withOpacity(0.15),
+                color: AppColors.streakOrange.withValues(alpha: 0.15),
                 child: ListTile(
                   leading: const Icon(
                     Icons.wifi_off,
@@ -281,7 +338,11 @@ class _HomeTabState extends State<HomeTab> {
                   data.me == null ||
                   data.me!.sourcePlatform == 'unknown' ||
                   data.me!.syncedAt.millisecondsSinceEpoch == 0,
-              onConnectHealth: _openHealthSetup,
+              useHealthAutoExportBridge:
+                  defaultTargetPlatform == TargetPlatform.iOS,
+              onConnectHealth: defaultTargetPlatform == TargetPlatform.iOS
+                  ? _openHealthAutoExportSetup
+                  : _openHealthSetup,
             ),
             const SizedBox(height: 24),
             const _SectionHeader(
@@ -336,16 +397,21 @@ class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
     required this.aggregate,
     required this.needsHealthConnection,
+    required this.useHealthAutoExportBridge,
     required this.onConnectHealth,
   });
 
   final DailyActivityAggregate? aggregate;
   final bool needsHealthConnection;
+  final bool useHealthAutoExportBridge;
   final VoidCallback onConnectHealth;
 
   @override
   Widget build(BuildContext context) {
     if (needsHealthConnection) {
+      if (useHealthAutoExportBridge) {
+        return _HealthAutoExportCard(onOpen: onConnectHealth);
+      }
       return HealthConnectionCard(onConnect: onConnectHealth);
     }
 
@@ -400,6 +466,50 @@ class _SummaryCard extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HealthAutoExportCard extends StatelessWidget {
+  const _HealthAutoExportCard({required this.onOpen});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.sync_alt, color: AppColors.primaryLight),
+                const SizedBox(width: 8),
+                Text(
+                  'Salud por puente',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Health Auto Export envía tus datos de Apple Salud a la app. '
+              'No necesitas activar el permiso nativo de EnfermiCambio en el iPhone.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: onOpen,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Ver pasos y actualizar'),
             ),
           ],
         ),
@@ -515,7 +625,7 @@ class _RankingRowCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: rankColor.withOpacity(0.2),
+          backgroundColor: rankColor.withValues(alpha: 0.2),
           child: Text(
             '#${row.rank}',
             style: TextStyle(fontWeight: FontWeight.bold, color: rankColor),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../shared/config/app_environment.dart';
 import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
@@ -75,7 +76,7 @@ class _WeightScreenState extends State<WeightScreen> {
           controller: controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
           ],
           autofocus: true,
           decoration: const InputDecoration(
@@ -91,7 +92,9 @@ class _WeightScreenState extends State<WeightScreen> {
           ),
           FilledButton(
             onPressed: () {
-              final parsed = double.tryParse(controller.text.trim());
+              final parsed = double.tryParse(
+                controller.text.trim().replaceAll(',', '.'),
+              );
               if (parsed != null) {
                 Navigator.pop(context, parsed);
               }
@@ -102,8 +105,21 @@ class _WeightScreenState extends State<WeightScreen> {
       ),
     );
     if (value == null) return;
+    if (value < 20 || value > 400) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('El peso debe estar entre 20 y 400 kg.'),
+          ),
+        );
+      }
+      return;
+    }
     try {
-      await _repository.upsert(date: DateTime.now(), weightKg: value);
+      await _repository.upsert(
+        date: DateTime.parse(AppEnvironment.todayInCompetitionTz()),
+        weightKg: value,
+      );
       await _repository.notifyGoalIfMet();
       await _load();
     } on Exception {
@@ -127,7 +143,7 @@ class _WeightScreenState extends State<WeightScreen> {
           controller: controller,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           inputFormatters: [
-            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+            FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
           ],
           autofocus: true,
           decoration: const InputDecoration(
@@ -147,7 +163,9 @@ class _WeightScreenState extends State<WeightScreen> {
           ),
           FilledButton(
             onPressed: () {
-              final parsed = double.tryParse(controller.text.trim());
+              final parsed = double.tryParse(
+                controller.text.trim().replaceAll(',', '.'),
+              );
               if (parsed != null) {
                 Navigator.pop(context, parsed);
               }
@@ -158,6 +176,16 @@ class _WeightScreenState extends State<WeightScreen> {
       ),
     );
     if (value == null) return;
+    if (value != 0 && (value < 20 || value > 400)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('La meta debe estar entre 20 y 400 kg.'),
+          ),
+        );
+      }
+      return;
+    }
     try {
       await _repository.setGoal(value == 0 ? null : value);
       await _load();
@@ -201,8 +229,8 @@ class _WeightScreenState extends State<WeightScreen> {
                   Text(
                     'Historial',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -292,9 +320,7 @@ class _CurrentWeightCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  latest == null
-                      ? '--'
-                      : latest!.weightKg.toStringAsFixed(1),
+                  latest == null ? '--' : latest!.weightKg.toStringAsFixed(1),
                   style: const TextStyle(
                     fontSize: 44,
                     fontWeight: FontWeight.bold,
