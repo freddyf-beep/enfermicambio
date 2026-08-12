@@ -1,5 +1,9 @@
 enum UserFreshness { fresh, stale, missing, denied, unavailable }
 
+enum RankingTimePeriod { hoy, semana, temporada }
+
+enum RankingCategory { pasos, franjas, distancia, entrenamientos, calorias, puntos }
+
 class UserActivitySnapshot {
   const UserActivitySnapshot({
     required this.userId,

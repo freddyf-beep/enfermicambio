@@ -3,8 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:enfermicambio/features/ranking/domain/ranking_models.dart';
 import 'package:enfermicambio/features/ranking/presentation/ranking_tab.dart';
+import 'package:enfermicambio/shared/config/app_environment.dart';
 
 void main() {
+  test('todayInCompetitionTz returns yyyy-MM-dd', () {
+    final date = AppEnvironment.todayInCompetitionTz();
+    expect(RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(date), isTrue);
+  });
+
   testWidgets('renders all four users with freshness indicators', (
     tester,
   ) async {
@@ -49,15 +55,15 @@ void main() {
     expect(find.text('Nico'), findsOneWidget);
     expect(find.text('Pedro'), findsOneWidget);
     expect(find.text('Juan'), findsOneWidget);
-    expect(find.textContaining('stale'), findsOneWidget);
-    expect(find.text('no data yet'), findsOneWidget);
+    expect(find.textContaining('Desactualizado'), findsOneWidget);
+    expect(find.text('Sin datos aún'), findsOneWidget);
     expect(find.text('9.8k'), findsOneWidget);
   });
 
   testWidgets('shows empty state when the ranking has no rows', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(home: RankingTab(rows: const [], loadFromBackend: false)),
+      const MaterialApp(home: RankingTab(rows: [], loadFromBackend: false)),
     );
-    expect(find.textContaining('rankings will appear'), findsOneWidget);
+    expect(find.textContaining('Las clasificaciones del día'), findsOneWidget);
   });
 }
