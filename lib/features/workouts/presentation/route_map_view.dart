@@ -18,7 +18,9 @@ class RouteMapView extends StatelessWidget {
       return SizedBox(
         height: height,
         child: const AsyncStateView(
-          status: AsyncViewStatus.empty('No route data for this workout.'),
+          status: AsyncViewStatus.empty(
+            'La ruta aparecerá cuando el GPS obtenga una señal precisa.',
+          ),
         ),
       );
     }
@@ -37,7 +39,9 @@ class RouteMapView extends StatelessWidget {
           options: MapOptions(
             initialCenter: latLngs.first,
             initialZoom: 14,
-            initialCameraFit: CameraFit.bounds(bounds: bounds),
+            initialCameraFit: latLngs.length > 1
+                ? CameraFit.bounds(bounds: bounds)
+                : null,
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.all,
             ),
@@ -78,6 +82,11 @@ class RouteMapView extends StatelessWidget {
                     size: 20,
                   ),
                 ),
+              ],
+            ),
+            const RichAttributionWidget(
+              attributions: [
+                TextSourceAttribution('OpenStreetMap contributors'),
               ],
             ),
           ],

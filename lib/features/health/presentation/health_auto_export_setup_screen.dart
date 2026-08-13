@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -23,7 +24,9 @@ class _HealthAutoExportSetupScreenState
     extends State<HealthAutoExportSetupScreen> {
   late final HealthAutoExportSetupService _service;
   HealthAutoExportSetup? _setup;
+  HealthAutoExportStatus? _status;
   bool _loading = false;
+  bool _checking = true;
 
   @override
   void initState() {
@@ -31,6 +34,19 @@ class _HealthAutoExportSetupScreenState
     _service =
         widget.service ??
         HealthAutoExportSetupService(client: Supabase.instance.client);
+    _loadStatus();
+  }
+
+  Future<void> _loadStatus() async {
+    if (mounted) setState(() => _checking = true);
+    try {
+      final status = await _service.statusForCurrentUser();
+      if (mounted) setState(() => _status = status);
+    } on Exception {
+      // The installer stays usable while offline.
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
   }
 
   Future<void> _prepare() async {
@@ -38,10 +54,10 @@ class _HealthAutoExportSetupScreenState
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Preparar puente del iPhone'),
-        content: const Text(
-          'Se generará un token privado para esta cuenta y se reemplazará el token anterior. '
-          'Después abrirás dos automatizaciones en Health Auto Export: métricas y entrenamientos. '
-          'No compartas esos enlaces.',
+        content: Text(
+          _status?.configured == true
+              ? 'Esto reemplazará la credencial actual. Las automatizaciones instaladas dejarán de funcionar hasta que abras y guardes los dos enlaces nuevos. Úsalo solo para reparar o reinstalar el puente.'
+              : 'Se generará una credencial privada para esta cuenta. Después abrirás dos automatizaciones en Health Auto Export: métricas y entrenamientos. No compartas esos enlaces.',
         ),
         actions: [
           TextButton(
@@ -63,6 +79,7 @@ class _HealthAutoExportSetupScreenState
       if (!mounted) return;
       setState(() => _setup = setup);
       _showMessage('Configuración lista para esta cuenta.');
+      await _loadStatus();
     } on Exception catch (error) {
       if (!mounted) return;
       _showMessage('No se pudo preparar el puente: $error');
@@ -142,6 +159,24 @@ class _HealthAutoExportSetupScreenState
             ),
           ),
           const SizedBox(height: 16),
+          _BridgeStatusCard(
+            status: _status,
+            loading: _checking,
+            onRefresh: _loadStatus,
+          ),
+          if (_status?.lastReceivedAt != null) ...[
+            const SizedBox(height: 8),
+            const Card(
+              child: ListTile(
+                leading: Icon(Icons.cleaning_services_outlined),
+                title: Text('¿Health Auto Export aún muestra un error rojo?'),
+                subtitle: Text(
+                  'Si arriba aparece “Sincronización recibida correctamente”, el error pertenece a una automatización antigua duplicada. En Health Auto Export conserva EnfermiCambio - Salud y EnfermiCambio - Entrenamientos más recientes y elimina las versiones anteriores.',
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
           FilledButton.icon(
             onPressed: _loading ? null : _prepare,
             icon: _loading
@@ -152,7 +187,11 @@ class _HealthAutoExportSetupScreenState
                   )
                 : const Icon(Icons.auto_fix_high),
             label: Text(
-              _loading ? 'Preparando...' : 'Preparar automatizaciones',
+              _loading
+                  ? 'Preparando...'
+                  : _status?.configured == true
+                  ? 'Reinstalar automatizaciones'
+                  : 'Preparar automatizaciones',
             ),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(50),
@@ -160,7 +199,7 @@ class _HealthAutoExportSetupScreenState
           ),
           const SizedBox(height: 10),
           Text(
-            'Debes hacerlo con la cuenta que usará este iPhone. Si es para Sammy, Sammy debe iniciar sesión con su propia cuenta y generar su archivo. Al preparar de nuevo, el enlace anterior deja de funcionar.',
+            'Debes hacerlo con la cuenta que usará este iPhone. Si el estado aparece en verde, no vuelvas a preparar: pulsa comprobar. Reinstalar invalida los enlaces anteriores.',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -214,6 +253,63 @@ class _HealthAutoExportSetupScreenState
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _BridgeStatusCard extends StatelessWidget {
+  const _BridgeStatusCard({
+    required this.status,
+    required this.loading,
+    required this.onRefresh,
+  });
+
+  final HealthAutoExportStatus? status;
+  final bool loading;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final received = status?.lastReceivedAt;
+    final healthy =
+        received != null &&
+        DateTime.now().difference(received).abs() < const Duration(hours: 6);
+    final color = healthy
+        ? Colors.greenAccent
+        : status?.configured == true
+        ? AppColors.streakOrange
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+    final title = loading
+        ? 'Comprobando el puente…'
+        : healthy
+        ? 'Sincronización recibida correctamente'
+        : status?.configured == true
+        ? 'Configurado, sin recepción reciente'
+        : 'Puente todavía no configurado';
+    final details = received == null
+        ? 'Todavía no hay una ejecución confirmada por el servidor.'
+        : 'Última recepción: ${DateFormat('dd/MM · HH:mm').format(received)} · '
+              '${status?.latestDailySteps ?? 0} pasos.';
+
+    return Card(
+      child: ListTile(
+        leading: loading
+            ? const SizedBox.square(
+                dimension: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(
+                healthy ? Icons.cloud_done_outlined : Icons.sync_problem,
+                color: color,
+              ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(details),
+        trailing: IconButton(
+          tooltip: 'Comprobar ahora',
+          onPressed: loading ? null : onRefresh,
+          icon: const Icon(Icons.refresh),
+        ),
       ),
     );
   }

@@ -89,13 +89,19 @@ class FeedList extends StatelessWidget {
       );
     }
 
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: posts.length + (hasMore ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index >= posts.length) {
-          return Padding(
+    // Home already owns the vertical scroll. A regular Column avoids a nested
+    // shrink-wrapped ListView and keeps the feed layout deterministic on iOS.
+    return Column(
+      children: [
+        for (final post in posts)
+          _PostCard(
+            key: ValueKey('feed-post-${post.id}'),
+            post: post,
+            onReact: onReact,
+            onComment: onComment,
+          ),
+        if (hasMore)
+          Padding(
             padding: const EdgeInsets.all(16),
             child: Center(
               child: isLoadingMore
@@ -105,20 +111,19 @@ class FeedList extends StatelessWidget {
                       child: const Text('Cargar publicaciones anteriores'),
                     ),
             ),
-          );
-        }
-        return _PostCard(
-          post: posts[index],
-          onReact: onReact,
-          onComment: onComment,
-        );
-      },
+          ),
+      ],
     );
   }
 }
 
 class _PostCard extends StatelessWidget {
-  const _PostCard({required this.post, this.onReact, this.onComment});
+  const _PostCard({
+    required this.post,
+    this.onReact,
+    this.onComment,
+    super.key,
+  });
 
   final FeedPost post;
   final void Function(FeedPost post)? onReact;
@@ -193,7 +198,7 @@ class _PostCard extends StatelessWidget {
                         ],
                       ),
                       Text(
-                        DateFormat.MMMd('es').add_Hm().format(post.createdAt),
+                        _formatDate(post.createdAt),
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontSize: 11,
                         ),
@@ -327,6 +332,21 @@ class _PostCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatDate(DateTime value) {
+    try {
+      return DateFormat.MMMd('es').add_Hm().format(value.toLocal());
+    } on Object {
+      // Locale data must never turn every post into Flutter's grey release
+      // ErrorWidget. Keep a dependency-free fallback for partial startup/tests.
+      final local = value.toLocal();
+      final day = local.day.toString().padLeft(2, '0');
+      final month = local.month.toString().padLeft(2, '0');
+      final hour = local.hour.toString().padLeft(2, '0');
+      final minute = local.minute.toString().padLeft(2, '0');
+      return '$day/$month · $hour:$minute';
+    }
   }
 
   String _typeLabel(PostType type) {

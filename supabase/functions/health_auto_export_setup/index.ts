@@ -59,8 +59,10 @@ function automationLink(
     // upserts a daily aggregate, so an incremental lastsync window could
     // otherwise replace a complete total with only the latest slice.
     period: "none",
-    syncinterval: "hours",
-    syncquantity: "1",
+    // Five minutes matches the cadence used by the working manual setup. iOS
+    // may defer background work, but the automation should keep trying often.
+    syncinterval: "minutes",
+    syncquantity: "5",
     headers: `Authorization,Bearer ${token}`,
     requesttimeout: "60",
     batchrequests: "true",
@@ -121,6 +123,48 @@ export default {
           throw new Error(`profile lookup failed: ${profileError.message}`);
         }
         if (!profile) return jsonResponse({ error: "forbidden" }, 403);
+
+        let body: Record<string, unknown> = {};
+        try {
+          body = await req.json() as Record<string, unknown>;
+        } catch {
+          // Empty payload keeps the historical setup/rotation behaviour.
+        }
+
+        if (body.action === "status") {
+          const { data: existingToken, error: tokenError } = await ctx
+            .supabaseAdmin
+            .from("health_ingestion_tokens")
+            .select("token_prefix, active, last_used_at")
+            .eq("user_id", userId)
+            .eq("source", SOURCE)
+            .maybeSingle();
+          if (tokenError) {
+            throw new Error(`token status failed: ${tokenError.message}`);
+          }
+
+          const { data: latestActivity, error: activityError } = await ctx
+            .supabaseAdmin
+            .from("daily_activity")
+            .select("activity_date, daily_steps, synced_at")
+            .eq("user_id", userId)
+            .eq("source_app", "Health Auto Export")
+            .order("activity_date", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (activityError) {
+            throw new Error(`activity status failed: ${activityError.message}`);
+          }
+
+          return jsonResponse({
+            configured: Boolean(existingToken?.active),
+            token_prefix: existingToken?.token_prefix ?? null,
+            last_received_at: existingToken?.last_used_at ?? null,
+            latest_activity_date: latestActivity?.activity_date ?? null,
+            latest_daily_steps: latestActivity?.daily_steps ?? null,
+            latest_synced_at: latestActivity?.synced_at ?? null,
+          });
+        }
 
         const rawToken = base64Url(crypto.getRandomValues(
           new Uint8Array(TOKEN_BYTES),

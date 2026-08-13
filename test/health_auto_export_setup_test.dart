@@ -3,6 +3,21 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:enfermicambio/features/health/data/health_auto_export_setup_service.dart';
 
 void main() {
+  test('parses the latest bridge reception status', () {
+    final status = HealthAutoExportStatus.fromJson({
+      'configured': true,
+      'token_prefix': 'abc123456789',
+      'last_received_at': '2026-08-13T15:45:15.480Z',
+      'latest_activity_date': '2026-08-13',
+      'latest_daily_steps': 56,
+    });
+
+    expect(status.configured, isTrue);
+    expect(status.tokenPrefix, 'abc123456789');
+    expect(status.lastReceivedAt, isNotNull);
+    expect(status.latestDailySteps, 56);
+  });
+
   test('parses the two Health Auto Export deep links', () {
     final setup = HealthAutoExportSetup.fromJson({
       'token_prefix': 'abc123456789',

@@ -31,6 +31,24 @@ class Workout {
 
   /// Identity used to de-duplicate against the `(source, external_id)` guard.
   String? get dedupeKey => externalId;
+
+  Workout copyWith({String? id, bool? routeAvailable}) {
+    return Workout(
+      id: id ?? this.id,
+      userId: userId,
+      workoutType: workoutType,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      durationSeconds: durationSeconds,
+      source: source,
+      externalId: externalId,
+      distanceMeters: distanceMeters,
+      activeCalories: activeCalories,
+      avgPace: avgPace,
+      avgSpeed: avgSpeed,
+      routeAvailable: routeAvailable ?? this.routeAvailable,
+    );
+  }
 }
 
 class RoutePoint {

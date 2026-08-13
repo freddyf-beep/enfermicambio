@@ -6,6 +6,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/ui/app_theme.dart';
+import '../../workouts/presentation/workout_history_screen.dart';
+import '../../workouts/presentation/workout_recorder_screen.dart';
 import '../../feed/data/supabase_post_repository.dart';
 import '../data/open_food_facts_repository.dart';
 import '../data/meal_media_repository.dart';
@@ -789,6 +791,31 @@ class _RegisterTabState extends State<RegisterTab> {
             onRefresh: _loadToday,
           ),
           const SizedBox(height: 16),
+          _ActionCard(
+            icon: Icons.route_outlined,
+            title: 'Iniciar entrenamiento con GPS',
+            subtitle:
+                'Registra carrera, caminata o ciclismo con ruta, tiempo y ritmo.',
+            color: AppColors.fitnessGreen,
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const WorkoutRecorderScreen(),
+                ),
+              );
+            },
+          ),
+          _ActionCard(
+            icon: Icons.history,
+            title: 'Historial de entrenamientos',
+            subtitle: 'Revisa tus rutas y el progreso de esta semana.',
+            color: AppColors.primaryLight,
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const WorkoutHistoryScreen()),
+              );
+            },
+          ),
           _ActionCard(
             icon: Icons.qr_code_scanner,
             title: 'Escanear código de barras',

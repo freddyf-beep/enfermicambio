@@ -10,6 +10,8 @@
 	<string>Enfermicambio usa movimiento y actividad física para detectar y validar tu entrenamiento.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Enfermicambio usa tu ubicación precisa mientras entrenas para registrar y mostrar la ruta recorrida.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Enfermicambio mantiene el GPS activo durante una carrera, caminata o salida en bicicleta, incluso si bloqueas la pantalla, para no cortar tu ruta.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Enfermicambio usa Bluetooth para encontrar y conectar sensores deportivos, como pulsómetros y accesorios de actividad.</string>
 	<key>NSCameraUsageDescription</key>
