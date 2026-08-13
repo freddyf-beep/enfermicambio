@@ -97,6 +97,11 @@ class Achievement {
     required this.description,
     required this.icon,
     required this.hidden,
+    this.metric = '',
+    this.operator = 'gte',
+    this.threshold = 0,
+    this.timeWindow,
+    this.seasonPoints = 0,
   });
 
   factory Achievement.fromJson(Map<String, dynamic> json) => Achievement(
@@ -106,6 +111,11 @@ class Achievement {
     description: (json['description'] as String?) ?? '',
     icon: (json['icon'] as String?) ?? 'military_tech',
     hidden: (json['hidden'] as bool?) ?? false,
+    metric: (json['metric'] as String?) ?? '',
+    operator: (json['operator'] as String?) ?? 'gte',
+    threshold: ((json['threshold'] as num?) ?? 0).toDouble(),
+    timeWindow: json['time_window'] as String?,
+    seasonPoints: ((json['season_points'] as num?) ?? 0).toInt(),
   );
 
   final String id;
@@ -114,6 +124,11 @@ class Achievement {
   final String description;
   final String icon;
   final bool hidden;
+  final String metric;
+  final String operator;
+  final double threshold;
+  final String? timeWindow;
+  final int seasonPoints;
 }
 
 class UserAchievement {

@@ -9,6 +9,7 @@ import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
 import '../data/supabase_game_repository.dart';
+import '../domain/game_explanations.dart';
 import '../domain/game_models.dart';
 
 /// Datos agregados de la pantalla JUEGO. Cuando `loadFromBackend` es false,
@@ -335,6 +336,15 @@ class _GameTabState extends State<GameTab> {
               icon: Icons.assignment_turned_in,
             ),
             const SizedBox(height: 8),
+            Text(
+              'Las misiones cambian automáticamente. Toca una para ver exactamente '
+              'qué cuenta, en qué horario y cómo se gana.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
             if (snapshot.missions.isEmpty)
               const AsyncStateView(
                 status: AsyncViewStatus.empty(
@@ -367,32 +377,33 @@ class _GameTabState extends State<GameTab> {
                 _StreakCard(streak: streak),
             const SizedBox(height: 24),
 
-            const _SectionHeader(title: 'Logros', icon: Icons.military_tech),
+            const _SectionHeader(
+              title: 'Logros',
+              icon: Icons.military_tech,
+            ),
             const SizedBox(height: 8),
             if (snapshot.achievements.isEmpty)
               const AsyncStateView(
                 status: AsyncViewStatus.empty('Aún no hay logros publicados.'),
               )
-            else
-              GridView.count(
-                crossAxisCount: 3,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                children: [
-                  for (final achievement in snapshot.achievements)
-                    _BadgeTile(
-                      name: achievement.name,
-                      description: achievement.description,
-                      icon: achievement.icon,
-                      unlocked: snapshot.unlockedAchievements.contains(
-                        achievement.id,
-                      ),
-                      isSecret: achievement.hidden,
-                    ),
-                ],
+            else ...[
+              Text(
+                'Cada logro explica su objetivo. Tócalo para saber qué debes '
+                'hacer y cuándo se desbloquea.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
+              const SizedBox(height: 8),
+              for (final achievement in snapshot.achievements)
+                _BadgeTile(
+                  achievement: achievement,
+                  unlocked: snapshot.unlockedAchievements.contains(
+                    achievement.id,
+                  ),
+                ),
+            ],
             const SizedBox(height: 24),
 
             const _SectionHeader(
@@ -737,6 +748,8 @@ class _MissionCard extends StatelessWidget {
     final target = ((mission.rules['target'] as num?) ?? 0).toDouble();
     final value = progress?.valueOf(metric) ?? 0;
     final completed = progress?.completed ?? false;
+    final isCompetitive = mission.missionType == 'competitive';
+    final isBoolean = metric == 'active_day' || metric == 'balanced_day';
     final icon = switch (mission.missionType) {
       'cooperative' => Icons.group,
       'competitive' => Icons.emoji_events,
@@ -747,74 +760,76 @@ class _MissionCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => _showDetails(
-          context,
-          metric: metric,
-          target: target,
-          value: value,
-          completed: completed,
-        ),
+        onTap: () => _showDetails(context),
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: AppColors.primaryLight, size: 28),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            repairMojibake(mission.name),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                        if (completed)
-                          const Icon(
-                            Icons.check_circle,
-                            color: AppColors.fitnessGreen,
-                            size: 20,
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      repairMojibake(mission.description),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+              Row(
+                children: [
+                  Icon(icon, color: AppColors.primaryLight, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      repairMojibake(mission.name),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: target <= 0
-                            ? 0
-                            : (value / target).clamp(0.0, 1.0),
-                        backgroundColor: AppColors.darkSurfaceVariant,
-                        color: AppColors.fitnessGreen,
-                      ),
+                  ),
+                  if (completed)
+                    const Icon(
+                      Icons.check_circle,
+                      color: AppColors.fitnessGreen,
+                      size: 20,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${_formatNumber(value)} / ${_formatNumber(target)}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                missionTypeLabel(mission.missionType),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryLight,
                 ),
               ),
-              const SizedBox(width: 12),
-              Column(
+              const SizedBox(height: 6),
+              Text(
+                repairMojibake(mission.description),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Qué hacer: ${missionTargetText(mission)}',
+                style: const TextStyle(fontSize: 13),
+              ),
+              if (!isCompetitive && !isBoolean) ...[
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: target <= 0 ? 0 : (value / target).clamp(0.0, 1.0),
+                    backgroundColor: AppColors.darkSurfaceVariant,
+                    color: AppColors.fitnessGreen,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 6),
+              Text(
+                missionProgressText(mission, value, completed),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -826,7 +841,7 @@ class _MissionCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      '+${mission.rewardPoints} pts',
+                      '+${mission.rewardPoints} puntos',
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -834,11 +849,19 @@ class _MissionCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const Spacer(),
                   Icon(
-                    Icons.info_outline,
+                    Icons.touch_app_outlined,
                     size: 16,
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Toca para entenderla',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -849,15 +872,13 @@ class _MissionCard extends StatelessWidget {
     );
   }
 
-  Future<void> _showDetails(
-    BuildContext context, {
-    required String metric,
-    required double target,
-    required double value,
-    required bool completed,
-  }) async {
+  Future<void> _showDetails(BuildContext context) async {
+    final metric = (mission.rules['metric'] as String?) ?? 'steps';
+    final value = progress?.valueOf(metric) ?? 0;
+    final completed = progress?.completed ?? false;
     final extra = mission.rules['details'] as String?;
     final description = repairMojibake(mission.description);
+    final type = missionTypeLabel(mission.missionType);
     await showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -865,7 +886,9 @@ class _MissionCard extends StatelessWidget {
         content: SingleChildScrollView(
           child: ListBody(
             children: [
-              Text(description.isEmpty ? 'Misión diaria' : description),
+              Text(type, style: const TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text(description.isEmpty ? 'Reto diario' : description),
               const SizedBox(height: 16),
               Text(
                 'Cómo se completa',
@@ -874,17 +897,20 @@ class _MissionCard extends StatelessWidget {
                 ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
-              Text(
-                'Alcanza ${_formatMissionTarget(metric, target)} en ${_metricLabel(metric)}.',
-              ),
+              Text(missionTargetText(mission)),
               if (extra != null && extra.trim().isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Text(repairMojibake(extra)),
               ],
               const SizedBox(height: 16),
               Text(
-                'Progreso: ${_formatMissionTarget(metric, value)} de ${_formatMissionTarget(metric, target)}',
+                'Tu progreso',
+                style: Theme.of(
+                  dialogContext,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
+              const SizedBox(height: 4),
+              Text(missionProgressText(mission, value, completed)),
               const SizedBox(height: 4),
               Text(completed ? 'Estado: completada' : 'Estado: en progreso'),
               const SizedBox(height: 4),
@@ -900,30 +926,6 @@ class _MissionCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _metricLabel(String metric) {
-    return switch (metric) {
-      'steps' ||
-      'morning_steps' ||
-      'afternoon_steps' ||
-      'night_steps' => 'pasos',
-      'distance_meters' || 'workout_distance_m' => 'distancia',
-      'active_calories' => 'calorías activas',
-      'exercise_minutes' => 'minutos de ejercicio',
-      _ => metric.replaceAll('_', ' '),
-    };
-  }
-
-  String _formatMissionTarget(String metric, double value) {
-    if (metric == 'distance_meters' || metric == 'workout_distance_m') {
-      return value >= 1000
-          ? '${(value / 1000).toStringAsFixed(1)} km'
-          : '${value.round()} m';
-    }
-    if (metric == 'active_calories') return '${value.round()} kcal';
-    if (metric == 'exercise_minutes') return '${value.round()} min';
-    return '${_formatNumber(value)} ${_metricLabel(metric)}';
   }
 }
 
@@ -956,57 +958,156 @@ class _StreakCard extends StatelessWidget {
 
 class _BadgeTile extends StatelessWidget {
   const _BadgeTile({
-    required this.name,
-    required this.description,
-    required this.icon,
+    required this.achievement,
     required this.unlocked,
-    required this.isSecret,
   });
 
-  final String name;
-  final String description;
-  final String icon;
+  final Achievement achievement;
   final bool unlocked;
-  final bool isSecret;
 
   @override
   Widget build(BuildContext context) {
-    final visible = unlocked || !isSecret;
+    final visible = unlocked || !achievement.hidden;
+    final name = repairMojibake(achievement.name);
+    final description = repairMojibake(achievement.description);
     final color = unlocked
         ? AppColors.trophyPurple
         : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.4);
-    final iconData = !visible ? Icons.lock : _iconFor(icon);
-    return Tooltip(
-      message: visible
-          ? '$name — $description'
-          : 'Logro secreto: desbloquéalo para verlo.',
-      child: Card(
-        color: unlocked
-            ? AppColors.darkSurfaceVariant
-            : Theme.of(context).cardTheme.color?.withValues(alpha: 0.5),
+    final iconData = !visible ? Icons.lock : _iconFor(achievement.icon);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      color: unlocked
+          ? AppColors.darkSurfaceVariant
+          : Theme.of(context).cardTheme.color?.withValues(alpha: 0.5),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _showDetails(context),
         child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
             children: [
-              Icon(iconData, size: 28, color: color),
-              const SizedBox(height: 6),
-              Text(
-                visible ? name : '???',
-                textAlign: TextAlign.center,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: unlocked ? FontWeight.bold : FontWeight.normal,
-                  color: unlocked
-                      ? Theme.of(context).colorScheme.onSurface
-                      : Theme.of(context).colorScheme.onSurfaceVariant,
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
                 ),
+                child: Icon(iconData, size: 25, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      visible ? name : 'Logro secreto',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: unlocked
+                            ? Theme.of(context).colorScheme.onSurface
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      visible
+                          ? description
+                          : 'Desbloquéalo para descubrir cómo funciona.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      unlocked ? 'Desbloqueado' : 'Toca para ver el objetivo',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: unlocked
+                            ? AppColors.fitnessGreen
+                            : AppColors.primaryLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                unlocked ? Icons.check_circle : Icons.info_outline,
+                color: unlocked
+                    ? AppColors.fitnessGreen
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _showDetails(BuildContext context) async {
+    final name = repairMojibake(achievement.name);
+    final description = repairMojibake(achievement.description);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(name),
+        content: SingleChildScrollView(
+          child: ListBody(
+            children: [
+              Text(
+                'Qué significa',
+                style: Theme.of(
+                  dialogContext,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                achievement.hidden && !unlocked
+                    ? 'Es un logro oculto. Se mostrará completo cuando cumplas su condición.'
+                    : description,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Cómo se desbloquea',
+                style: Theme.of(
+                  dialogContext,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                achievement.hidden && !unlocked
+                    ? 'Cumple el objetivo de este logro para revelarlo.'
+                    : achievementRequirement(achievement),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                unlocked
+                    ? 'Estado: desbloqueado'
+                    : 'Estado: todavía no desbloqueado',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: unlocked
+                      ? AppColors.fitnessGreen
+                      : Theme.of(dialogContext).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (achievement.seasonPoints > 0) ...[
+                const SizedBox(height: 8),
+                Text('Recompensa: ${achievement.seasonPoints} puntos de temporada'),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Entendido'),
+          ),
+        ],
       ),
     );
   }
@@ -1135,19 +1236,6 @@ class _SeasonHistorySection extends StatelessWidget {
     final champion = season.where((r) => r.position == 1).firstOrNull;
     return champion?.displayName ?? 'Sin registro';
   }
-}
-
-String _formatNumber(double value) {
-  if (value >= 100000) return '${(value / 1000).toStringAsFixed(1)}k';
-  final rounded = value.round();
-  final digits = rounded.toString();
-  final buffer = StringBuffer();
-  for (var i = 0; i < digits.length; i++) {
-    buffer.write(digits[i]);
-    final remaining = digits.length - i - 1;
-    if (remaining > 0 && remaining % 3 == 0) buffer.write('.');
-  }
-  return buffer.toString();
 }
 
 IconData _iconFor(String name) {

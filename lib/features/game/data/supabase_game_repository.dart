@@ -72,7 +72,10 @@ class SupabaseGameRepository {
   Future<List<Achievement>> achievements() async {
     final rows = await _client
         .from('achievements')
-        .select('id, code, name, description, icon, hidden')
+        .select(
+          'id, code, name, description, icon, metric, operator, threshold, '
+          'time_window, hidden, season_points',
+        )
         .order('threshold');
     return rows
         .cast<Map<String, dynamic>>()

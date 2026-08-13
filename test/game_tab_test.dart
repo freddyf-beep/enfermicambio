@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:enfermicambio/features/game/domain/game_models.dart';
+import 'package:enfermicambio/features/game/domain/game_explanations.dart';
 import 'package:enfermicambio/features/game/presentation/game_tab.dart';
 
 void main() {
@@ -42,6 +43,27 @@ void main() {
       });
       expect(secret.hidden, isTrue);
       expect(secret.name, 'Logro secreto');
+    });
+
+    test('Achievement parses the requirement fields', () {
+      final achievement = Achievement.fromJson({
+        'id': 'a4',
+        'code': '5K_CLUB',
+        'name': 'Club 5K',
+        'description': 'Alcanza 5.000 pasos en un mismo día.',
+        'icon': 'directions_walk',
+        'metric': 'daily_steps',
+        'operator': 'gte',
+        'threshold': 5000,
+        'time_window': null,
+        'hidden': false,
+        'season_points': 0,
+      });
+      expect(achievement.threshold, 5000);
+      expect(
+        achievementRequirement(achievement),
+        'Alcanza 5.000 pasos en un mismo día.',
+      );
     });
 
     test('Streak parses counts', () {
@@ -103,6 +125,26 @@ void main() {
       expect(find.text('Cómo se completa'), findsOneWidget);
       expect(find.textContaining('pasos'), findsWidgets);
       expect(find.text('Recompensa: 10 puntos'), findsOneWidget);
+    });
+
+    testWidgets('al tocar un logro muestra cómo se desbloquea', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GameTab(loadFromBackend: false, snapshot: buildSnapshot()),
+        ),
+      );
+
+      await tester.scrollUntilVisible(
+        find.text('Club 5K'),
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Club 5K'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cómo se desbloquea'), findsOneWidget);
+      expect(find.textContaining('5.000 pasos'), findsWidgets);
+      expect(find.textContaining('desbloqueado'), findsWidgets);
     });
 
     testWidgets('JUEGO muestra logros, pase, rachas y km', (tester) async {
@@ -184,6 +226,8 @@ GameSnapshot buildSnapshot() => const GameSnapshot(
       description: '5.000 pasos en un día',
       icon: 'directions_walk',
       hidden: false,
+      metric: 'daily_steps',
+      threshold: 5000,
     ),
     Achievement(
       id: 'a2',
@@ -192,6 +236,8 @@ GameSnapshot buildSnapshot() => const GameSnapshot(
       description: '25.000 pasos en un día',
       icon: 'directions_run',
       hidden: false,
+      metric: 'daily_steps',
+      threshold: 25000,
     ),
     Achievement(
       id: 'a3',
