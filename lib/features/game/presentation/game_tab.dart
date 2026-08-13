@@ -377,10 +377,7 @@ class _GameTabState extends State<GameTab> {
                 _StreakCard(streak: streak),
             const SizedBox(height: 24),
 
-            const _SectionHeader(
-              title: 'Logros',
-              icon: Icons.military_tech,
-            ),
+            const _SectionHeader(title: 'Logros', icon: Icons.military_tech),
             const SizedBox(height: 8),
             if (snapshot.achievements.isEmpty)
               const AsyncStateView(
@@ -957,10 +954,7 @@ class _StreakCard extends StatelessWidget {
 }
 
 class _BadgeTile extends StatelessWidget {
-  const _BadgeTile({
-    required this.achievement,
-    required this.unlocked,
-  });
+  const _BadgeTile({required this.achievement, required this.unlocked});
 
   final Achievement achievement;
   final bool unlocked;
@@ -1097,7 +1091,9 @@ class _BadgeTile extends StatelessWidget {
               ),
               if (achievement.seasonPoints > 0) ...[
                 const SizedBox(height: 8),
-                Text('Recompensa: ${achievement.seasonPoints} puntos de temporada'),
+                Text(
+                  'Recompensa: ${achievement.seasonPoints} puntos de temporada',
+                ),
               ],
             ],
           ),

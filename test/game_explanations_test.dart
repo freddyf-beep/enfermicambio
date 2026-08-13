@@ -34,4 +34,3 @@ void main() {
     expect(formatGameValue('vs_14d_avg', 1.2), '120%');
   });
 }
-

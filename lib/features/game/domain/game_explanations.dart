@@ -89,11 +89,7 @@ String missionTargetText(Mission mission) {
   return '$verb $targetText ${missionTimeWindow(metric)}.';
 }
 
-String missionProgressText(
-  Mission mission,
-  double value,
-  bool completed,
-) {
+String missionProgressText(Mission mission, double value, bool completed) {
   final metric = (mission.rules['metric'] as String?) ?? 'steps';
   if (mission.missionType == 'competitive') {
     return 'Tu marca: ${formatGameValue(metric, value)}. '
