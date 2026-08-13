@@ -12,9 +12,11 @@ import UIKit
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
-    let registrar = engineBridge.pluginRegistry.registrar(
+    guard let registrar = engineBridge.pluginRegistry.registrar(
       forPlugin: "EnfermiCambioLauncherIcon"
-    )
+    ) else {
+      return
+    }
     let channel = FlutterMethodChannel(
       name: "enfermicambio/launcher_icon",
       binaryMessenger: registrar.messenger()
