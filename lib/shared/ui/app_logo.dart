@@ -24,7 +24,7 @@ class AppLogos {
     ),
     AppLogoOption(
       id: 'red-transparent',
-      label: 'Freddy',
+      label: 'Atleta',
       assetPath: 'assets/logos/logo-red-transparent.png',
     ),
     AppLogoOption(

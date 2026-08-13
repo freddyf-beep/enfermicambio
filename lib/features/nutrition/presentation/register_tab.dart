@@ -14,6 +14,8 @@ import '../domain/nutrition_models.dart';
 import '../domain/nutrition_service.dart';
 import 'barcode_scan_screen.dart';
 
+enum _FoodLookupAction { retry, create }
+
 class RegisterTab extends StatefulWidget {
   const RegisterTab({super.key});
 
@@ -25,7 +27,7 @@ class _RegisterTabState extends State<RegisterTab> {
   late final SupabasePostRepository _posts;
   late final SupabaseNutritionRepository _nutrition;
   late final MealMediaRepository _mealMedia;
-  final _foodResolver = OpenFoodFactsRepository();
+  late final OpenFoodFactsRepository _foodResolver;
   final _imagePicker = ImagePicker();
   List<FoodEntry> _todayEntries = const [];
   int _dailyTarget = 2200;
@@ -38,6 +40,17 @@ class _RegisterTabState extends State<RegisterTab> {
     _posts = SupabasePostRepository(client: client);
     _nutrition = SupabaseNutritionRepository(client: client);
     _mealMedia = MealMediaRepository(client: client);
+    _foodResolver = OpenFoodFactsRepository(
+      fallbackLookup: (barcode) async {
+        final response = await client.functions.invoke(
+          'food_lookup',
+          body: {'barcode': barcode},
+        );
+        final data = response.data;
+        if (data is! Map) throw const FormatException('Respuesta inválida');
+        return Map<String, dynamic>.from(data);
+      },
+    );
     _loadToday();
   }
 
@@ -222,41 +235,71 @@ class _RegisterTabState extends State<RegisterTab> {
       await _showLogMealDialog(food);
     } on FoodLookupFailure catch (failure) {
       if (!mounted) return;
-      if (failure == FoodLookupFailure.notFound) {
-        final createCustom = await showDialog<bool>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: const Text('Producto no encontrado'),
-            content: Text(
-              'El código $barcode no está registrado. ¿Deseas crear este alimento para el grupo?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: const Text('Cancelar'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: const Text('Crear alimento'),
-              ),
-            ],
-          ),
-        );
-        if (createCustom == true && mounted) {
-          final created = await _showCustomFoodModal(barcode: barcode);
-          if (created != null && mounted) await _showLogMealDialog(created);
-        }
-      } else {
+      if (failure == FoodLookupFailure.invalidBarcode) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(
-              'No se pudo consultar el código. Revisa tu conexión.',
-            ),
+            content: Text('El código debe contener 8, 12, 13 o 14 números.'),
           ),
         );
+        return;
+      }
+
+      final normalized = OpenFoodFactsRepository.normalizeBarcode(barcode);
+      final action = await showDialog<_FoodLookupAction>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(
+            failure == FoodLookupFailure.notFound
+                ? 'Producto no encontrado'
+                : 'No pudimos consultar el producto',
+          ),
+          content: Text(
+            '${_foodLookupMessage(failure)}\n\n'
+            'Puedes reintentar o crearlo manualmente. Quedará disponible para los cuatro usuarios.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            TextButton.icon(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, _FoodLookupAction.retry),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reintentar'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, _FoodLookupAction.create),
+              child: const Text('Crear alimento'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (action == _FoodLookupAction.retry) {
+        await _resolveBarcode(normalized ?? barcode);
+        return;
+      }
+      if (action == _FoodLookupAction.create) {
+        final created = await _showCustomFoodModal(barcode: normalized);
+        if (created != null && mounted) await _showLogMealDialog(created);
       }
     }
   }
+
+  String _foodLookupMessage(FoodLookupFailure failure) => switch (failure) {
+    FoodLookupFailure.notFound =>
+      'Open Food Facts no tiene registrado el código escaneado.',
+    FoodLookupFailure.timeout =>
+      'Open Food Facts tardó demasiado en responder.',
+    FoodLookupFailure.network =>
+      'El servicio de alimentos está temporalmente sin conexión.',
+    FoodLookupFailure.malformed =>
+      'El servicio devolvió datos incompletos para este producto.',
+    FoodLookupFailure.invalidBarcode =>
+      'El código escaneado no tiene un formato válido.',
+  };
 
   Future<void> _showLogMealDialog(Food food) async {
     MealType selectedMeal = MealType.lunch;

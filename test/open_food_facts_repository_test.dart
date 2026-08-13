@@ -9,7 +9,8 @@ import 'package:enfermicambio/features/nutrition/data/open_food_facts_repository
 void main() {
   test('resolves a product by barcode with serving nutrition', () async {
     final client = MockClient((request) async {
-      expect(request.url.path, contains('3017624010701.json'));
+      expect(request.url.path, contains('/api/v3/product/3017624010701'));
+      expect(request.headers['User-Agent'], contains('EnfermiCambio'));
       return http.Response(
         jsonEncode({
           'status': 1,
@@ -127,4 +128,32 @@ void main() {
     expect(food.calories, 150);
     expect(food.proteinG, 3);
   });
+
+  test(
+    'uses the authenticated fallback when the direct API is unavailable',
+    () async {
+      final client = MockClient((_) async => http.Response('bad gateway', 502));
+      var fallbackCalls = 0;
+      final food = await OpenFoodFactsRepository(
+        client: client,
+        fallbackLookup: (barcode) async {
+          fallbackCalls += 1;
+          expect(barcode, '3017624010701');
+          return {
+            'status': 'success',
+            'product': {
+              'product_name': 'Producto de respaldo',
+              'serving_quantity': 50,
+              'nutriments': {'energy-kcal_100g': 400, 'proteins_100g': 8},
+            },
+          };
+        },
+      ).resolveByBarcode('3017624010701');
+
+      expect(fallbackCalls, 1);
+      expect(food.name, 'Producto de respaldo');
+      expect(food.calories, 200);
+      expect(food.proteinG, 4);
+    },
+  );
 }

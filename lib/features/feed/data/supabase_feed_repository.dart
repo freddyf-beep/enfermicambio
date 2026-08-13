@@ -3,6 +3,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/text/text_encoding.dart';
 import '../domain/feed_models.dart';
 
+/// Feed access kept deliberately flat.
+///
+/// PostgREST nested relations are convenient, but one malformed relation,
+/// missing foreign-key metadata, or a storage URL can make the whole response
+/// impossible to decode. Posts are the source of truth; profiles, media and
+/// counters are optional enrichments and can fail independently.
 class SupabaseFeedRepository implements FeedRepository {
   const SupabaseFeedRepository({required this._client});
 
@@ -19,59 +25,162 @@ class SupabaseFeedRepository implements FeedRepository {
   }
 
   Future<FeedPage> _load({required int limit, String? before}) async {
+    final requestedLimit = limit < 1 ? 1 : limit;
     PostgrestFilterBuilder<List<Map<String, dynamic>>> query = _client
         .from('posts')
         .select(
-          'id, author_id, post_type, caption, created_at, system_generated, '
-          'profiles!posts_author_id_fkey(display_name, avatar_url), '
-          'post_media(url, media_type, sort_order), '
-          'reactions(count), comments(count)',
+          'id, author_id, post_type, caption, created_at, system_generated',
         );
-    if (before != null) {
+    if (before != null && before.isNotEmpty) {
       query = query.lt('created_at', before);
     }
-    final data = await query
-        .order('created_at', ascending: false)
-        .limit(limit + 1);
 
-    final hasMore = data.length > limit;
-    final slice = hasMore ? data.sublist(0, limit) : data;
-    final nextCursor = hasMore ? (slice.last['created_at'] as String) : null;
+    final rawPosts = await query
+        .order('created_at', ascending: false)
+        .limit(requestedLimit + 1);
+    final data = _asRows(rawPosts);
+    final hasMore = data.length > requestedLimit;
+    final slice = hasMore ? data.sublist(0, requestedLimit) : data;
+    if (slice.isEmpty) {
+      return const FeedPage(posts: [], nextCursor: null);
+    }
+
+    final postIds = slice
+        .map((row) => _string(row['id']))
+        .whereType<String>()
+        .toList();
+    final authorIds = slice
+        .map((row) => _string(row['author_id']))
+        .whereType<String>()
+        .toSet()
+        .toList();
+
+    // These queries are independent. A missing profile or a denied media
+    // relation must never hide a text/event post from the feed.
+    final related = await Future.wait<List<Map<String, dynamic>>>([
+      _fetchByIds(
+        table: 'profiles',
+        columns: 'id, display_name, avatar_url',
+        column: 'id',
+        ids: authorIds,
+      ),
+      _fetchByIds(
+        table: 'post_media',
+        columns: 'post_id, url, media_type, sort_order',
+        column: 'post_id',
+        ids: postIds,
+      ),
+      _fetchByIds(
+        table: 'reactions',
+        columns: 'post_id',
+        column: 'post_id',
+        ids: postIds,
+      ),
+      _fetchByIds(
+        table: 'comments',
+        columns: 'post_id',
+        column: 'post_id',
+        ids: postIds,
+      ),
+    ]);
+
+    final profilesById = <String, Map<String, dynamic>>{
+      for (final row in related[0]) ?_string(row['id']): row,
+    };
+    final mediaByPost = _groupById(related[1], 'post_id');
+    final reactionCounts = _countById(related[2]);
+    final commentCounts = _countById(related[3]);
 
     final posts = await Future.wait(
-      slice
-          .map<Future<FeedPost>>((row) async {
-            final author = _relationObject(row['profiles']);
-            final media = await _resolveMedia(row['post_media']);
-            return FeedPost(
-              id: row['id'] as String,
-              authorId: row['author_id'] as String,
-              authorName: repairMojibake(
-                (author['display_name'] as String?) ?? 'Unknown',
-              ),
-              authorAvatarUrl: author['avatar_url'] as String?,
-              type: _mapType(row['post_type'] as String),
-              createdAt: DateTime.parse(row['created_at'] as String),
-              isSystem: row['system_generated'] as bool,
-              caption: (row['caption'] as String?) == null
-                  ? null
-                  : repairMojibake(row['caption'] as String),
-              mediaUrls: media,
-              reactionCount: _count(row['reactions']),
-              commentCount: _count(row['comments']),
-            );
-          })
-          .toList(growable: false),
+      slice.map((row) async {
+        final postId = _string(row['id']) ?? '';
+        final authorId = _string(row['author_id']) ?? '';
+        final profile = profilesById[authorId] ?? const <String, dynamic>{};
+        final media = await _resolveMedia(mediaByPost[postId] ?? const []);
+        final createdAt =
+            DateTime.tryParse(_string(row['created_at']) ?? '')?.toLocal() ??
+            DateTime.now();
+        final rawCaption = row['caption'];
+
+        return FeedPost(
+          id: postId,
+          authorId: authorId,
+          authorName: repairMojibake(
+            _string(profile['display_name']) ?? 'Amigo',
+          ),
+          authorAvatarUrl: _string(profile['avatar_url']),
+          type: _mapType(_string(row['post_type']) ?? ''),
+          createdAt: createdAt,
+          isSystem: row['system_generated'] == true,
+          caption: rawCaption == null
+              ? null
+              : repairMojibake(rawCaption.toString()),
+          mediaUrls: media,
+          reactionCount: reactionCounts[postId] ?? 0,
+          commentCount: commentCounts[postId] ?? 0,
+        );
+      }),
     );
 
-    return FeedPage(posts: posts, nextCursor: nextCursor);
+    return FeedPage(
+      posts: posts,
+      nextCursor: hasMore ? _string(slice.last['created_at']) : null,
+    );
   }
 
-  Future<List<String>> _resolveMedia(dynamic rawMedia) async {
-    final media = rawMedia is List ? rawMedia : const <dynamic>[];
+  Future<List<Map<String, dynamic>>> _fetchByIds({
+    required String table,
+    required String columns,
+    required String column,
+    required List<String> ids,
+  }) async {
+    if (ids.isEmpty) return const [];
+    try {
+      final rows = await _client
+          .from(table)
+          .select(columns)
+          .inFilter(column, ids);
+      return _asRows(rows);
+    } on Object {
+      return const [];
+    }
+  }
+
+  List<Map<String, dynamic>> _asRows(dynamic value) {
+    if (value is! List) return const [];
+    return value
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList(growable: false);
+  }
+
+  Map<String, List<Map<String, dynamic>>> _groupById(
+    List<Map<String, dynamic>> rows,
+    String key,
+  ) {
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final row in rows) {
+      final id = _string(row[key]);
+      if (id == null || id.isEmpty) continue;
+      (grouped[id] ??= <Map<String, dynamic>>[]).add(row);
+    }
+    return grouped;
+  }
+
+  Map<String, int> _countById(List<Map<String, dynamic>> rows) {
+    final counts = <String, int>{};
+    for (final row in rows) {
+      final id = _string(row['post_id']);
+      if (id == null || id.isEmpty) continue;
+      counts[id] = (counts[id] ?? 0) + 1;
+    }
+    return counts;
+  }
+
+  Future<List<String>> _resolveMedia(List<Map<String, dynamic>> media) async {
     final urls = await Future.wait(
-      media.map((raw) async {
-        final value = raw is Map ? raw['url'] as String? : null;
+      media.map((row) async {
+        final value = _string(row['url']);
         if (value == null || value.isEmpty) return null;
         if (value.startsWith('http://') || value.startsWith('https://')) {
           return value;
@@ -83,7 +192,7 @@ class SupabaseFeedRepository implements FeedRepository {
         final path = value.substring(separator + 1);
         try {
           return await _client.storage.from(bucket).createSignedUrl(path, 3600);
-        } on Exception {
+        } on Object {
           return null;
         }
       }),
@@ -91,22 +200,10 @@ class SupabaseFeedRepository implements FeedRepository {
     return urls.whereType<String>().toList(growable: false);
   }
 
-  int _count(dynamic rows) {
-    if (rows is! List || rows.isEmpty) return 0;
-    final first = rows.first;
-    if (first is Map<String, dynamic>) {
-      return ((first['count'] as num?) ?? 0).toInt();
-    }
-    return 0;
-  }
-
-  Map<String, dynamic> _relationObject(dynamic value) {
-    if (value is Map<String, dynamic>) return value;
-    if (value is Map) return value.cast<String, dynamic>();
-    if (value is List && value.isNotEmpty && value.first is Map) {
-      return (value.first as Map).cast<String, dynamic>();
-    }
-    return const {};
+  String? _string(dynamic value) {
+    if (value == null) return null;
+    final result = value.toString().trim();
+    return result.isEmpty ? null : result;
   }
 
   PostType _mapType(String type) {
