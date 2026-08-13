@@ -7,6 +7,8 @@ class HealthAutoExportStatus {
     required this.lastReceivedAt,
     required this.latestActivityDate,
     required this.latestDailySteps,
+    required this.automationsExpected,
+    required this.latestRun,
   });
 
   final bool configured;
@@ -14,6 +16,8 @@ class HealthAutoExportStatus {
   final DateTime? lastReceivedAt;
   final DateTime? latestActivityDate;
   final int? latestDailySteps;
+  final int automationsExpected;
+  final HealthIngestionRunSummary? latestRun;
 
   factory HealthAutoExportStatus.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(Object? value) {
@@ -21,14 +25,61 @@ class HealthAutoExportStatus {
       return DateTime.tryParse(value)?.toLocal();
     }
 
+    final warnings = json['last_run_warnings'];
     return HealthAutoExportStatus(
       configured: json['configured'] == true,
       tokenPrefix: json['token_prefix'] as String?,
       lastReceivedAt: parseDate(json['last_received_at']),
       latestActivityDate: parseDate(json['latest_activity_date']),
       latestDailySteps: (json['latest_daily_steps'] as num?)?.toInt(),
+      automationsExpected: (json['automations_expected'] as num?)?.toInt() ?? 2,
+      latestRun: json['last_run_status'] is String
+          ? HealthIngestionRunSummary(
+              status: json['last_run_status'] as String,
+              receivedAt: parseDate(json['last_run_received_at']),
+              stage: json['last_run_stage'] as String?,
+              metricSamples:
+                  (json['last_run_metric_samples'] as num?)?.toInt() ?? 0,
+              manualSamplesSkipped:
+                  (json['last_run_manual_samples_skipped'] as num?)?.toInt() ??
+                  0,
+              workouts: (json['last_run_workouts'] as num?)?.toInt() ?? 0,
+              routePoints:
+                  (json['last_run_route_points'] as num?)?.toInt() ?? 0,
+              warnings: warnings is List
+                  ? warnings.whereType<String>().toList(growable: false)
+                  : const [],
+              errorMessage: json['last_run_error'] as String?,
+            )
+          : null,
     );
   }
+}
+
+class HealthIngestionRunSummary {
+  const HealthIngestionRunSummary({
+    required this.status,
+    required this.receivedAt,
+    required this.stage,
+    required this.metricSamples,
+    required this.manualSamplesSkipped,
+    required this.workouts,
+    required this.routePoints,
+    required this.warnings,
+    required this.errorMessage,
+  });
+
+  final String status;
+  final DateTime? receivedAt;
+  final String? stage;
+  final int metricSamples;
+  final int manualSamplesSkipped;
+  final int workouts;
+  final int routePoints;
+  final List<String> warnings;
+  final String? errorMessage;
+
+  bool get succeeded => status == 'success';
 }
 
 class HealthAutoExportSetup {

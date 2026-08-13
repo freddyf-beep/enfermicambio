@@ -18,6 +18,8 @@ import 'barcode_scan_screen.dart';
 
 enum _FoodLookupAction { retry, create }
 
+enum _PostMediaChoice { text, camera, gallery }
+
 class RegisterTab extends StatefulWidget {
   const RegisterTab({super.key});
 
@@ -141,6 +143,43 @@ class _RegisterTabState extends State<RegisterTab> {
   }
 
   Future<void> _createTextPost() async {
+    final choice = await showModalBottomSheet<_PostMediaChoice>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Publicar solo texto'),
+              onTap: () => Navigator.pop(context, _PostMediaChoice.text),
+            ),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('Tomar foto y publicar'),
+              onTap: () => Navigator.pop(context, _PostMediaChoice.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Elegir foto y publicar'),
+              onTap: () => Navigator.pop(context, _PostMediaChoice.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    if (choice != _PostMediaChoice.text) {
+      await _createPhotoPost(
+        choice == _PostMediaChoice.camera
+            ? ImageSource.camera
+            : ImageSource.gallery,
+      );
+      return;
+    }
+    await _createTextOnlyPost();
+  }
+
+  Future<void> _createTextOnlyPost() async {
     final controller = TextEditingController();
     final caption = await showDialog<String>(
       context: context,
@@ -184,6 +223,71 @@ class _RegisterTabState extends State<RegisterTab> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('No se pudo publicar: $error')));
+    }
+  }
+
+  Future<void> _createPhotoPost(ImageSource source) async {
+    final image = await _imagePicker.pickImage(
+      source: source,
+      imageQuality: 82,
+      maxWidth: 1600,
+      maxHeight: 1600,
+    );
+    if (image == null || !mounted) return;
+    final controller = TextEditingController();
+    final caption = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Nueva foto'),
+        content: TextField(
+          controller: controller,
+          maxLines: 4,
+          maxLength: 1000,
+          decoration: const InputDecoration(
+            hintText: 'Agrega una descripción (opcional)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            child: const Text('Publicar'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (caption == null || !mounted) return;
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      await _posts.uploadPhotoPostWithRetry(
+        authorId: userId,
+        caption: caption.isEmpty ? 'Foto compartida con el grupo.' : caption,
+        filePath: image.path,
+        bucket: 'feed-media',
+        contentType: image.mimeType ?? 'image/jpeg',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Foto compartida con el grupo.')),
+      );
+    } on Exception catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo publicar la foto: $error'),
+          action: SnackBarAction(
+            label: 'Reintentar',
+            onPressed: () => _createPhotoPost(source),
+          ),
+        ),
+      );
     }
   }
 

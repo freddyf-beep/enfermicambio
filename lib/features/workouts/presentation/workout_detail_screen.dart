@@ -4,8 +4,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
+import '../../feed/data/supabase_post_repository.dart';
 import '../data/supabase_workout_repository.dart';
 import '../data/supabase_workout_route_repository.dart';
+import '../data/route_preview_service.dart';
 import '../domain/workout_models.dart';
 import 'route_map_view.dart';
 
@@ -21,6 +23,7 @@ class WorkoutDetailScreen extends StatefulWidget {
 class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   late final SupabaseWorkoutRepository _workouts;
   late final SupabaseWorkoutRouteRepository _routes;
+  late final SupabasePostRepository _posts;
   Workout? _workout;
   List<RoutePoint>? _route;
   AsyncViewStatus? _status;
@@ -31,6 +34,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     super.initState();
     _workouts = SupabaseWorkoutRepository(client: Supabase.instance.client);
     _routes = SupabaseWorkoutRouteRepository(client: Supabase.instance.client);
+    _posts = SupabasePostRepository(client: Supabase.instance.client);
     _load();
   }
 
@@ -59,22 +63,21 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
   Future<void> _publishToFeed() async {
     final workout = _workout;
     if (workout == null) return;
+    if (workout.routeAvailable) {
+      await _shareRouteToFeed(workout);
+      return;
+    }
     setState(() {
       _publishing = true;
     });
     try {
       final userId = Supabase.instance.client.auth.currentSession?.user.id;
-      final km = (workout.distanceMeters ?? 0) / 1000;
-      final minutes = (workout.durationSeconds / 60).round();
-      await Supabase.instance.client.from('posts').insert({
-        'author_id': userId,
-        'post_type': workout.routeAvailable ? 'route' : 'workout',
-        'caption':
-            '${_typeLabel(workout.workoutType)} - ${km.toStringAsFixed(1)} km '
-            'en $minutes min',
-        'workout_id': workout.id,
-        'system_generated': false,
-      });
+      if (userId == null) throw StateError('No hay una sesión activa.');
+      await _posts.createWorkoutPost(
+        authorId: userId,
+        workoutId: workout.id,
+        caption: _defaultCaption(workout),
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('¡Entrenamiento publicado en el feed!')),
@@ -91,6 +94,113 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
         });
       }
     }
+  }
+
+  Future<void> _shareRouteToFeed(Workout workout) async {
+    final route = _route ?? const <RoutePoint>[];
+    if (route.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Esta actividad no tiene puntos GPS válidos y no se puede compartir como ruta.',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    final controller = TextEditingController();
+    final caption = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Compartir recorrido'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              RouteMapView(points: route, height: 210),
+              const SizedBox(height: 12),
+              Text(_defaultCaption(workout)),
+              const SizedBox(height: 4),
+              Text(
+                'Calorías: ${(workout.activeCalories ?? 0).round()} kcal'
+                '${workout.avgPace == null ? '' : ' · Ritmo: ${workout.avgPace!.toStringAsFixed(1)} min/km'}',
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLength: 300,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Texto opcional',
+                  hintText: '¿Cómo estuvo el recorrido?',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton.icon(
+            onPressed: () =>
+                Navigator.pop(dialogContext, controller.text.trim()),
+            icon: const Icon(Icons.public),
+            label: const Text('Compartir en el Feed'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (caption == null || !mounted) return;
+    setState(() => _publishing = true);
+    try {
+      final userId = Supabase.instance.client.auth.currentSession?.user.id;
+      if (userId == null) throw StateError('No hay una sesión activa.');
+      final preview = await const RoutePreviewService().render(route);
+      await _posts.shareWorkoutRoute(
+        authorId: userId,
+        workoutId: workout.id,
+        caption: caption.isEmpty
+            ? _defaultCaption(workout)
+            : '${_defaultCaption(workout)}\n$caption',
+        previewBytes: preview,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ruta compartida en el Feed.')),
+        );
+      }
+    } on Exception catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo compartir la ruta: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _publishing = false);
+    }
+  }
+
+  String _defaultCaption(Workout workout) {
+    return '${_typeLabel(workout.workoutType)} · ${_distanceLabel(workout.distanceMeters)} '
+        '· ${_durationLabel(workout.durationSeconds)}';
+  }
+
+  String _distanceLabel(double? meters) {
+    final value = meters ?? 0;
+    if (value < 1000) return '${value.round()} m';
+    return '${(value / 1000).toStringAsFixed(2)} km';
+  }
+
+  String _durationLabel(int seconds) {
+    if (seconds < 60) return '$seconds s';
+    return '${(seconds / 60).round()} min';
   }
 
   String _typeLabel(String type) {
@@ -169,7 +279,11 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                   onPressed: _publishing ? null : _publishToFeed,
                   icon: const Icon(Icons.public),
                   label: Text(
-                    _publishing ? 'Publicando...' : 'Publicar en el Feed',
+                    _publishing
+                        ? 'Publicando...'
+                        : workout.routeAvailable
+                        ? 'Compartir ruta en el Feed'
+                        : 'Publicar en el Feed',
                   ),
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -189,14 +303,16 @@ class _StatsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final minutes = (workout.durationSeconds / 60).round();
-    final km = (workout.distanceMeters ?? 0) / 1000;
+    final meters = workout.distanceMeters ?? 0;
     final kcal = workout.activeCalories ?? 0;
     return Row(
       children: [
         Expanded(
           child: _Stat(
             label: 'Distancia',
-            value: '${km.toStringAsFixed(2)} km',
+            value: meters < 1000
+                ? '${meters.round()} m'
+                : '${(meters / 1000).toStringAsFixed(2)} km',
             color: AppColors.fitnessGreen,
           ),
         ),

@@ -212,8 +212,8 @@ async function handle(
       author_id: winnerId ?? profiles?.[0]?.id,
       post_type: "round_result",
       caption:
-        `Daily result for ${dayLabel}: ${winnerName} takes the day` +
-        (rows.length > 0 ? ` with ${rows[0].daily_steps} steps. ` : ". ") +
+        `Resultado del día ${dayLabel}: ${winnerName} ganó el día` +
+        (rows.length > 0 ? ` con ${rows[0].daily_steps} pasos. ` : ". ") +
         `[${postMarker}]`,
       system_generated: true,
     });

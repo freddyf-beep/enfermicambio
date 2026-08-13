@@ -171,8 +171,9 @@ async function handle(
       author_id: winnerId,
       post_type: "round_result",
       caption:
-        `${winnerProfile?.display_name ?? "Someone"} won the ` +
-        `${round} round (${start}-${end}) on ${competitionDate}. ` +
+        `${winnerProfile?.display_name ?? "Alguien"} ganó la franja de ` +
+        `${round === "morning" ? "la mañana" : round === "afternoon" ? "la tarde" : "la noche"} ` +
+        `(${start}–${end}) el ${competitionDate}. ` +
         `[${postMarker}]`,
       system_generated: true,
     });

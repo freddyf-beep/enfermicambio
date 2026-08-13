@@ -21,6 +21,7 @@ class FeedPost {
     required this.createdAt,
     required this.isSystem,
     this.caption,
+    this.workoutId,
     this.authorAvatarUrl,
     this.mediaUrls = const [],
     this.reactionCount = 0,
@@ -35,6 +36,7 @@ class FeedPost {
   final DateTime createdAt;
   final bool isSystem;
   final String? caption;
+  final String? workoutId;
   final List<String> mediaUrls;
   final int reactionCount;
   final int commentCount;

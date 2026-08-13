@@ -13,6 +13,7 @@ class FeedList extends StatelessWidget {
     this.isLoadingMore = false,
     this.onReact,
     this.onComment,
+    this.onOpenWorkout,
     this.errorMessage,
     this.onRetry,
   });
@@ -23,6 +24,7 @@ class FeedList extends StatelessWidget {
   final bool isLoadingMore;
   final void Function(FeedPost post)? onReact;
   final void Function(FeedPost post)? onComment;
+  final void Function(FeedPost post)? onOpenWorkout;
   final String? errorMessage;
   final VoidCallback? onRetry;
 
@@ -99,6 +101,8 @@ class FeedList extends StatelessWidget {
             post: post,
             onReact: onReact,
             onComment: onComment,
+            onOpenWorkout: onOpenWorkout,
+            onRetryMedia: onRetry,
           ),
         if (hasMore)
           Padding(
@@ -122,12 +126,16 @@ class _PostCard extends StatelessWidget {
     required this.post,
     this.onReact,
     this.onComment,
+    this.onOpenWorkout,
+    this.onRetryMedia,
     super.key,
   });
 
   final FeedPost post;
   final void Function(FeedPost post)? onReact;
   final void Function(FeedPost post)? onComment;
+  final void Function(FeedPost post)? onOpenWorkout;
+  final VoidCallback? onRetryMedia;
 
   @override
   Widget build(BuildContext context) {
@@ -250,12 +258,37 @@ class _PostCard extends StatelessWidget {
                       errorBuilder: (_, _, _) => Container(
                         width: 140,
                         color: AppColors.darkSurfaceVariant,
-                        child: const Icon(
-                          Icons.broken_image_outlined,
-                          color: AppColors.streakOrange,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.broken_image_outlined,
+                              color: AppColors.streakOrange,
+                            ),
+                            if (onRetryMedia != null)
+                              TextButton(
+                                onPressed: onRetryMedia,
+                                child: const Text('Reintentar'),
+                              ),
+                          ],
                         ),
                       ),
                     ),
+                  ),
+                ),
+              ),
+            ],
+            if (post.workoutId != null && onOpenWorkout != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () => onOpenWorkout!(post),
+                  icon: const Icon(Icons.map_outlined, size: 18),
+                  label: Text(
+                    post.type == PostType.route
+                        ? 'Abrir recorrido'
+                        : 'Ver entrenamiento',
                   ),
                 ),
               ),

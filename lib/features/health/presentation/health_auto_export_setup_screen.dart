@@ -159,11 +159,15 @@ class _HealthAutoExportSetupScreenState
             ),
           ),
           const SizedBox(height: 16),
-          _BridgeStatusCard(
+          _BridgeStatusCardV2(
             status: _status,
             loading: _checking,
             onRefresh: _loadStatus,
           ),
+          if (_status?.latestRun != null) ...[
+            const SizedBox(height: 8),
+            _IngestionRunCard(run: _status!.latestRun!),
+          ],
           if (_status?.lastReceivedAt != null) ...[
             const SizedBox(height: 8),
             const Card(
@@ -258,6 +262,132 @@ class _HealthAutoExportSetupScreenState
   }
 }
 
+class _IngestionRunCard extends StatelessWidget {
+  const _IngestionRunCard({required this.run});
+
+  final HealthIngestionRunSummary run;
+
+  @override
+  Widget build(BuildContext context) {
+    final ok = run.succeeded;
+    return Card(
+      child: ListTile(
+        leading: Icon(
+          ok ? Icons.fact_check_outlined : Icons.warning_amber_outlined,
+          color: ok ? Colors.greenAccent : AppColors.streakOrange,
+        ),
+        title: Text(
+          ok
+              ? 'Recepción confirmada por el servidor'
+              : 'Recepción con observaciones',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          'Métricas: ${run.metricSamples} · entrenamientos: ${run.workouts} · '
+          'GPS: ${run.routePoints} puntos · manuales excluidos: '
+          '${run.manualSamplesSkipped}'
+          '${run.errorMessage == null ? '' : '\n${run.errorMessage}'}',
+        ),
+      ),
+    );
+  }
+}
+
+class _BridgeStatusCardV2 extends StatelessWidget {
+  const _BridgeStatusCardV2({
+    required this.status,
+    required this.loading,
+    required this.onRefresh,
+  });
+
+  final HealthAutoExportStatus? status;
+  final bool loading;
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final run = status?.latestRun;
+    final received = run?.receivedAt ?? status?.lastReceivedAt;
+    final recent =
+        received != null &&
+        DateTime.now().difference(received).abs() < const Duration(hours: 6);
+    final healthy = run?.succeeded == true || (run == null && recent);
+    final failed = run?.status == 'failed';
+    final color = healthy
+        ? Colors.greenAccent
+        : failed || status?.configured == true
+        ? AppColors.streakOrange
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+    final title = loading
+        ? 'Comprobando el puente…'
+        : healthy
+        ? 'Recepción confirmada por el servidor'
+        : failed
+        ? 'La última recepción terminó con error'
+        : status?.configured == true
+        ? 'Configurado, sin recepción reciente'
+        : 'Puente todavía no configurado';
+    final details = received == null
+        ? 'Todavía no hay una ejecución confirmada por el servidor.'
+        : 'Última recepción: ${DateFormat('dd/MM · HH:mm').format(received)} · '
+              '${status?.latestDailySteps ?? 0} pasos.';
+    final runDetails = run == null
+        ? null
+        : 'Métricas: ${run.metricSamples} · entrenamientos: ${run.workouts} · '
+              'GPS: ${run.routePoints} puntos · manuales excluidos: '
+              '${run.manualSamplesSkipped}';
+
+    return Card(
+      child: ListTile(
+        leading: loading
+            ? const SizedBox.square(
+                dimension: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(
+                healthy ? Icons.cloud_done_outlined : Icons.sync_problem,
+                color: color,
+              ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(details),
+            if (runDetails != null) ...[
+              const SizedBox(height: 4),
+              Text(runDetails),
+            ],
+            if (failed && run?.errorMessage != null) ...[
+              const SizedBox(height: 4),
+              Text(run!.errorMessage!),
+            ],
+            if (healthy && run != null) ...[
+              const SizedBox(height: 4),
+              const Text(
+                'Si Health Auto Export mostró -999, esta recepción sí llegó al servidor; normalmente fue una cancelación de esa ejecución externa.',
+              ),
+            ],
+            if (status != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                'Mantén las ${status!.automationsExpected} automatizaciones: métricas y entrenamientos/rutas.',
+              ),
+            ],
+          ],
+        ),
+        trailing: IconButton(
+          tooltip: 'Comprobar ahora',
+          onPressed: loading ? null : onRefresh,
+          icon: const Icon(Icons.refresh),
+        ),
+      ),
+    );
+  }
+}
+
+// Kept for compatibility with older widget tests; the screen uses the
+// ingestion-aware card above.
+// ignore: unused_element
 class _BridgeStatusCard extends StatelessWidget {
   const _BridgeStatusCard({
     required this.status,

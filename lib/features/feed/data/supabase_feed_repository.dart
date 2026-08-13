@@ -29,7 +29,7 @@ class SupabaseFeedRepository implements FeedRepository {
     PostgrestFilterBuilder<List<Map<String, dynamic>>> query = _client
         .from('posts')
         .select(
-          'id, author_id, post_type, caption, created_at, system_generated',
+          'id, author_id, post_type, caption, workout_id, created_at, system_generated',
         );
     if (before != null && before.isNotEmpty) {
       query = query.lt('created_at', before);
@@ -115,6 +115,7 @@ class SupabaseFeedRepository implements FeedRepository {
           caption: rawCaption == null
               ? null
               : repairMojibake(rawCaption.toString()),
+          workoutId: _string(row['workout_id']),
           mediaUrls: media,
           reactionCount: reactionCounts[postId] ?? 0,
           commentCount: commentCounts[postId] ?? 0,

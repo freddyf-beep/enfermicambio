@@ -156,6 +156,21 @@ export default {
             throw new Error(`activity status failed: ${activityError.message}`);
           }
 
+          const { data: latestRun, error: runError } = await ctx
+            .supabaseAdmin
+            .from("health_ingestion_runs")
+            .select(
+              "status, received_at, stage, metric_samples, manual_samples_skipped, workouts, route_points, imported_dates, warnings, error_message",
+            )
+            .eq("user_id", userId)
+            .eq("source", SOURCE)
+            .order("received_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (runError) {
+            throw new Error(`ingestion status failed: ${runError.message}`);
+          }
+
           return jsonResponse({
             configured: Boolean(existingToken?.active),
             token_prefix: existingToken?.token_prefix ?? null,
@@ -163,6 +178,17 @@ export default {
             latest_activity_date: latestActivity?.activity_date ?? null,
             latest_daily_steps: latestActivity?.daily_steps ?? null,
             latest_synced_at: latestActivity?.synced_at ?? null,
+            automations_expected: 2,
+            last_run_status: latestRun?.status ?? null,
+            last_run_received_at: latestRun?.received_at ?? null,
+            last_run_stage: latestRun?.stage ?? null,
+            last_run_metric_samples: latestRun?.metric_samples ?? 0,
+            last_run_manual_samples_skipped: latestRun?.manual_samples_skipped ?? 0,
+            last_run_workouts: latestRun?.workouts ?? 0,
+            last_run_route_points: latestRun?.route_points ?? 0,
+            last_run_imported_dates: latestRun?.imported_dates ?? [],
+            last_run_warnings: latestRun?.warnings ?? [],
+            last_run_error: latestRun?.error_message ?? null,
           });
         }
 

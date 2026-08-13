@@ -125,6 +125,7 @@ class SupabaseNutritionRepository {
           'fat_g': entry.fatG,
           'notes': null,
           'food_name_snapshot': entry.foodName,
+          'photo_url': entry.photoUrl,
         })
         .eq('id', entry.id)
         .eq('user_id', _userId)

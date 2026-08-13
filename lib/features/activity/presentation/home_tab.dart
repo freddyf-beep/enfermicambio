@@ -12,6 +12,7 @@ import '../../app/data/offline_post_service.dart';
 import '../../app/presentation/notification_bell.dart';
 import '../../feed/domain/feed_models.dart';
 import '../../feed/presentation/feed_list.dart';
+import '../../workouts/presentation/workout_detail_screen.dart';
 import '../../health/data/health_plugin_repository.dart';
 import '../../health/domain/health_models.dart';
 import '../../health/presentation/health_connection_card.dart';
@@ -186,6 +187,17 @@ class _HomeTabState extends State<HomeTab> {
         );
       }
     }
+  }
+
+  Future<void> _openWorkout(FeedPost post) async {
+    final workoutId = post.workoutId;
+    if (workoutId == null || workoutId.isEmpty) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WorkoutDetailScreen(workoutId: workoutId),
+      ),
+    );
+    if (mounted) await _load();
   }
 
   Future<void> _openHealthSetup() async {
@@ -365,6 +377,7 @@ class _HomeTabState extends State<HomeTab> {
               onRetry: _load,
               onReact: _react,
               onComment: _comment,
+              onOpenWorkout: _openWorkout,
             ),
           ],
         ),

@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:io';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -54,6 +55,45 @@ class SupabasePostRepository {
     return postId;
   }
 
+  Future<String> createWorkoutPost({
+    required String authorId,
+    required String workoutId,
+    required String caption,
+  }) async {
+    final existing = await _client
+        .from('posts')
+        .select('id')
+        .eq('author_id', authorId)
+        .eq('workout_id', workoutId)
+        .eq('post_type', 'workout')
+        .maybeSingle();
+    if (existing != null) return existing['id'] as String;
+    try {
+      final row = await _client
+          .from('posts')
+          .insert({
+            'author_id': authorId,
+            'post_type': 'workout',
+            'caption': caption,
+            'workout_id': workoutId,
+            'system_generated': false,
+          })
+          .select('id')
+          .single();
+      return row['id'] as String;
+    } on PostgrestException catch (error) {
+      if (error.code != '23505') rethrow;
+      final raced = await _client
+          .from('posts')
+          .select('id')
+          .eq('author_id', authorId)
+          .eq('workout_id', workoutId)
+          .eq('post_type', 'workout')
+          .single();
+      return raced['id'] as String;
+    }
+  }
+
   Future<String> createMealPost({
     required String authorId,
     required String caption,
@@ -95,28 +135,188 @@ class SupabasePostRepository {
     required String filePath,
     String bucket = 'meal-media',
     String contentType = 'image/jpeg',
+  }) {
+    return uploadPhotoPostWithRetry(
+      authorId: authorId,
+      caption: caption,
+      filePath: filePath,
+      bucket: bucket,
+      contentType: contentType,
+    );
+  }
+
+  Future<String> uploadPhotoPostWithRetry({
+    required String authorId,
+    required String caption,
+    required String filePath,
+    String bucket = 'feed-media',
+    String contentType = 'image/jpeg',
+    int attempts = 3,
   }) async {
+    final extension = contentType.contains('png') ? '.png' : '.jpg';
     final storagePath =
-        '$authorId/${DateTime.now().microsecondsSinceEpoch}.jpg';
+        '$authorId/${DateTime.now().microsecondsSinceEpoch}$extension';
+    Object? lastError;
     final reference = '$bucket/$storagePath';
+    var uploaded = false;
+    for (var attempt = 0; attempt < attempts; attempt++) {
+      try {
+        await _client.storage
+            .from(bucket)
+            .upload(
+              storagePath,
+              File(filePath),
+              fileOptions: FileOptions(
+                contentType: contentType,
+                upsert: attempt > 0,
+              ),
+            );
+        uploaded = true;
+        break;
+      } on Object catch (error) {
+        lastError = error;
+        if (attempt + 1 < attempts) {
+          await Future<void>.delayed(const Duration(milliseconds: 350));
+        }
+      }
+    }
+    if (uploaded) {
+      try {
+        return await createPhotoPost(
+          authorId: authorId,
+          caption: caption,
+          mediaUrls: [reference],
+        );
+      } on Object {
+        try {
+          await _client.storage.from(bucket).remove([storagePath]);
+        } on Object {
+          // Best effort cleanup; preserve the post/media error.
+        }
+        rethrow;
+      }
+    }
+    try {
+      await _client.storage.from(bucket).remove([storagePath]);
+    } on Object {
+      // Best effort cleanup; preserve the upload/post error.
+    }
+    throw StateError(
+      'No se pudo publicar la foto tras $attempts intentos: $lastError',
+    );
+  }
+
+  Future<String> shareWorkoutRoute({
+    required String authorId,
+    required String workoutId,
+    required String caption,
+    required Uint8List previewBytes,
+  }) async {
+    const bucket = 'workout-media';
+    final storagePath = '$authorId/routes/$workoutId.png';
+    final reference = '$bucket/$storagePath';
+    final existing = await _client
+        .from('posts')
+        .select('id')
+        .eq('author_id', authorId)
+        .eq('workout_id', workoutId)
+        .eq('post_type', 'route')
+        .maybeSingle();
+    if (existing != null) {
+      // A feed retry must also repair a missing/deleted preview, not just
+      // return the already-existing post.
+      await _client.storage
+          .from(bucket)
+          .uploadBinary(
+            storagePath,
+            previewBytes,
+            fileOptions: const FileOptions(
+              contentType: 'image/png',
+              upsert: true,
+            ),
+          );
+      final postId = existing['id'] as String;
+      final media = await _client
+          .from('post_media')
+          .select('id')
+          .eq('post_id', postId)
+          .limit(1);
+      if (media.isEmpty) {
+        await _client.from('post_media').insert({
+          'post_id': postId,
+          'url': reference,
+          'media_type': 'image',
+          'sort_order': 0,
+        });
+      }
+      return postId;
+    }
+
     try {
       await _client.storage
           .from(bucket)
-          .upload(
+          .uploadBinary(
             storagePath,
-            File(filePath),
-            fileOptions: FileOptions(contentType: contentType, upsert: false),
+            previewBytes,
+            fileOptions: const FileOptions(
+              contentType: 'image/png',
+              upsert: true,
+            ),
           );
-      return await createPhotoPost(
-        authorId: authorId,
-        caption: caption,
-        mediaUrls: [reference],
-      );
-    } on Exception {
+      final row = await _client
+          .from('posts')
+          .insert({
+            'author_id': authorId,
+            'post_type': 'route',
+            'caption': caption,
+            'workout_id': workoutId,
+            'system_generated': false,
+          })
+          .select('id')
+          .single();
+      final postId = row['id'] as String;
+      await _client.from('post_media').insert({
+        'post_id': postId,
+        'url': reference,
+        'media_type': 'image',
+        'sort_order': 0,
+      });
+      return postId;
+    } on PostgrestException {
+      final raced = await _client
+          .from('posts')
+          .select('id')
+          .eq('author_id', authorId)
+          .eq('workout_id', workoutId)
+          .eq('post_type', 'route')
+          .maybeSingle();
+      if (raced != null) {
+        final media = await _client
+            .from('post_media')
+            .select('id')
+            .eq('post_id', raced['id'] as String)
+            .limit(1);
+        if (media.isEmpty) {
+          await _client.from('post_media').insert({
+            'post_id': raced['id'],
+            'url': reference,
+            'media_type': 'image',
+            'sort_order': 0,
+          });
+        }
+        return raced['id'] as String;
+      }
       try {
         await _client.storage.from(bucket).remove([storagePath]);
-      } on Exception {
-        // Best effort cleanup; keep the original upload/post error.
+      } on Object {
+        // Best effort cleanup.
+      }
+      rethrow;
+    } on Object {
+      try {
+        await _client.storage.from(bucket).remove([storagePath]);
+      } on Object {
+        // Best effort cleanup.
       }
       rethrow;
     }

@@ -34,6 +34,18 @@ type ImportSummary = {
   warnings: string[];
 };
 
+type IngestionRunUpdate = {
+  status?: "received" | "success" | "failed";
+  stage?: string;
+  metric_samples?: number;
+  manual_samples_skipped?: number;
+  workouts?: number;
+  route_points?: number;
+  imported_dates?: string[];
+  warnings?: string[];
+  error_message?: string | null;
+};
+
 const METRIC_KINDS = new Map<string, MetricKind>([
   ["step_count", "steps"],
   ["steps", "steps"],
@@ -369,9 +381,49 @@ async function insertRoutePoints(
       workout_id: workoutId,
       ...point,
     }));
-    const { error } = await admin.from("workout_route_points").insert(chunk);
+    const { error } = await admin.from("workout_route_points").upsert(chunk, {
+      onConflict: "workout_id,timestamp,latitude,longitude",
+    });
     if (error) throw new Error(`route point insert failed: ${error.message}`);
   }
+}
+
+async function startIngestionRun(
+  admin: AdminClient,
+  userId: string,
+  requestId: string,
+  receivedAt: string,
+): Promise<string | null> {
+  const { data, error } = await admin
+    .from("health_ingestion_runs")
+    .insert({
+      user_id: userId,
+      source: SOURCE,
+      request_id: requestId,
+      received_at: receivedAt,
+      status: "received",
+      stage: "received",
+    })
+    .select("id")
+    .single();
+  if (error || !data?.id) {
+    console.error("Health Auto Export audit start failed", error?.message);
+    return null;
+  }
+  return data.id as string;
+}
+
+async function updateIngestionRun(
+  admin: AdminClient,
+  runId: string | null,
+  update: IngestionRunUpdate,
+): Promise<void> {
+  if (!runId) return;
+  const { error } = await admin
+    .from("health_ingestion_runs")
+    .update(update)
+    .eq("id", runId);
+  if (error) console.error("Health Auto Export audit update failed", error.message);
 }
 
 async function importMetrics(
@@ -616,6 +668,7 @@ async function handle(admin: AdminClient, req: Request): Promise<Response> {
   if (!token) return jsonResponse({ error: "unauthorized" }, 401);
 
   let stage = "token";
+  let runId: string | null = null;
   try {
     const tokenHash = await sha256Hex(token);
   const { data: tokenRow, error: tokenError } = await admin
@@ -663,6 +716,12 @@ async function handle(admin: AdminClient, req: Request): Promise<Response> {
   const configuredTimeZone = asString(config?.config_value);
   const timeZone = configuredTimeZone ?? asString(profile.timezone) ?? DEFAULT_TIME_ZONE;
   const importedAt = new Date().toISOString();
+  runId = await startIngestionRun(
+    admin,
+    userId,
+    req.headers.get("x-request-id")?.trim() || crypto.randomUUID(),
+    importedAt,
+  );
 
   stage = "metrics";
   const metricResult = await importMetrics(admin, userId, payload, timeZone, importedAt);
@@ -690,8 +749,24 @@ async function handle(admin: AdminClient, req: Request): Promise<Response> {
     routePoints: workoutResult.routePoints,
     warnings,
   };
+  await updateIngestionRun(admin, runId, {
+    status: "success",
+    stage: "completed",
+    metric_samples: summary.metricSamples,
+    manual_samples_skipped: summary.manualSamplesSkipped,
+    workouts: summary.workouts,
+    route_points: summary.routePoints,
+    imported_dates: summary.dates,
+    warnings: summary.warnings,
+    error_message: null,
+  });
     return jsonResponse({ ok: true, imported: summary });
   } catch (error) {
+    await updateIngestionRun(admin, runId, {
+      status: "failed",
+      stage,
+      error_message: error instanceof Error ? error.message : String(error),
+    });
     console.error(
       `Health Auto Export bridge failed at ${stage}`,
       error instanceof Error ? error.message : String(error),
