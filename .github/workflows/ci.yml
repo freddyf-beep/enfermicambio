@@ -56,6 +56,9 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Generate launcher icon
+        run: dart run flutter_launcher_icons
+
       - name: Build debug APK
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -96,6 +99,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Generate launcher icon
+        run: dart run flutter_launcher_icons
 
       - name: Build iOS (no codesign)
         env:

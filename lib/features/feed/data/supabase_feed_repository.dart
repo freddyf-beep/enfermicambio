@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../shared/text/text_encoding.dart';
 import '../domain/feed_models.dart';
 
 class SupabaseFeedRepository implements FeedRepository {
@@ -45,12 +46,16 @@ class SupabaseFeedRepository implements FeedRepository {
             return FeedPost(
               id: row['id'] as String,
               authorId: row['author_id'] as String,
-              authorName: (author['display_name'] as String?) ?? 'Unknown',
+              authorName: repairMojibake(
+                (author['display_name'] as String?) ?? 'Unknown',
+              ),
               authorAvatarUrl: author['avatar_url'] as String?,
               type: _mapType(row['post_type'] as String),
               createdAt: DateTime.parse(row['created_at'] as String),
               isSystem: row['system_generated'] as bool,
-              caption: row['caption'] as String?,
+              caption: (row['caption'] as String?) == null
+                  ? null
+                  : repairMojibake(row['caption'] as String),
               mediaUrls: media,
               reactionCount: _count(row['reactions']),
               commentCount: _count(row['comments']),

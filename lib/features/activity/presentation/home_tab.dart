@@ -450,8 +450,8 @@ class _SummaryCard extends StatelessWidget {
                   child: _MetricTile(
                     icon: Icons.straighten,
                     label: 'Distancia',
-                    value: (agg.distanceMeters / 1000).toStringAsFixed(1),
-                    unit: 'km',
+                    value: _formatDistanceValue(agg.distanceMeters),
+                    unit: _formatDistanceUnit(agg.distanceMeters),
                     color: AppColors.fitnessGreen,
                   ),
                 ),
@@ -472,6 +472,18 @@ class _SummaryCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatDistanceValue(double meters) {
+  if (!meters.isFinite || meters <= 0) return '0';
+  if (meters < 1000) {
+    return meters < 100 ? meters.toStringAsFixed(1) : meters.round().toString();
+  }
+  return (meters / 1000).toStringAsFixed(1);
+}
+
+String _formatDistanceUnit(double meters) {
+  return meters >= 1000 ? 'km' : 'm';
 }
 
 class _HealthAutoExportCard extends StatelessWidget {

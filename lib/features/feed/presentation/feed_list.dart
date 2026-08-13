@@ -29,6 +29,7 @@ class FeedList extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
                 Icons.forum_outlined,

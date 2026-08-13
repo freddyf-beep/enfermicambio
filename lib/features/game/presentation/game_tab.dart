@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/config/app_environment.dart';
+import '../../../shared/text/text_encoding.dart';
 import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
@@ -744,85 +745,181 @@ class _MissionCard extends StatelessWidget {
 
     return Card(
       margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Icon(icon, color: AppColors.primaryLight, size: 28),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          mission.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _showDetails(
+          context,
+          metric: metric,
+          target: target,
+          value: value,
+          completed: completed,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.primaryLight, size: 28),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            repairMojibake(mission.name),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
-                      ),
-                      if (completed)
-                        const Icon(
-                          Icons.check_circle,
-                          color: AppColors.fitnessGreen,
-                          size: 20,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    mission.description,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        if (completed)
+                          const Icon(
+                            Icons.check_circle,
+                            color: AppColors.fitnessGreen,
+                            size: 20,
+                          ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: target <= 0 ? 0 : (value / target).clamp(0.0, 1.0),
-                      backgroundColor: AppColors.darkSurfaceVariant,
-                      color: completed
-                          ? AppColors.fitnessGreen
-                          : AppColors.fitnessGreen,
+                    const SizedBox(height: 2),
+                    Text(
+                      repairMojibake(mission.description),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: target <= 0 ? 0 : (value / target).clamp(0.0, 1.0),
+                        backgroundColor: AppColors.darkSurfaceVariant,
+                        color: AppColors.fitnessGreen,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_formatNumber(value)} / ${_formatNumber(target)}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.streakOrange.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '+${mission.rewardPoints} pts',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.streakOrange,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    '${_formatNumber(value)} / ${_formatNumber(target)}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                  Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.streakOrange.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '+${mission.rewardPoints} pts',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.streakOrange,
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _showDetails(
+    BuildContext context, {
+    required String metric,
+    required double target,
+    required double value,
+    required bool completed,
+  }) async {
+    final extra = mission.rules['details'] as String?;
+    final description = repairMojibake(mission.description);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(repairMojibake(mission.name)),
+        content: SingleChildScrollView(
+          child: ListBody(
+            children: [
+              Text(description.isEmpty ? 'Misión diaria' : description),
+              const SizedBox(height: 16),
+              Text(
+                'Cómo se completa',
+                style: Theme.of(dialogContext).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Alcanza ${_formatMissionTarget(metric, target)} en ${_metricLabel(metric)}.',
+              ),
+              if (extra != null && extra.trim().isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(repairMojibake(extra)),
+              ],
+              const SizedBox(height: 16),
+              Text(
+                'Progreso: ${_formatMissionTarget(metric, value)} de ${_formatMissionTarget(metric, target)}',
+              ),
+              const SizedBox(height: 4),
+              Text(completed ? 'Estado: completada' : 'Estado: en progreso'),
+              const SizedBox(height: 4),
+              Text('Recompensa: ${mission.rewardPoints} puntos'),
+            ],
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _metricLabel(String metric) {
+    return switch (metric) {
+      'steps' || 'morning_steps' || 'afternoon_steps' || 'night_steps' =>
+        'pasos',
+      'distance_meters' || 'workout_distance_m' => 'distancia',
+      'active_calories' => 'calorías activas',
+      'exercise_minutes' => 'minutos de ejercicio',
+      _ => metric.replaceAll('_', ' '),
+    };
+  }
+
+  String _formatMissionTarget(String metric, double value) {
+    if (metric == 'distance_meters' || metric == 'workout_distance_m') {
+      return value >= 1000
+          ? '${(value / 1000).toStringAsFixed(1)} km'
+          : '${value.round()} m';
+    }
+    if (metric == 'active_calories') return '${value.round()} kcal';
+    if (metric == 'exercise_minutes') return '${value.round()} min';
+    return '${_formatNumber(value)} ${_metricLabel(metric)}';
   }
 }
 

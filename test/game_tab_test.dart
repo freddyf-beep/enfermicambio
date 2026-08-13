@@ -90,6 +90,21 @@ void main() {
       expect(find.textContaining('1.250'), findsOneWidget);
     });
 
+    testWidgets('al tocar una misión muestra cómo se completa', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: GameTab(loadFromBackend: false, snapshot: buildSnapshot()),
+        ),
+      );
+
+      await tester.tap(find.text('Madrugador'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Cómo se completa'), findsOneWidget);
+      expect(find.textContaining('pasos'), findsWidgets);
+      expect(find.text('Recompensa: 10 puntos'), findsOneWidget);
+    });
+
     testWidgets('JUEGO muestra logros, pase, rachas y km', (tester) async {
       await tester.pumpWidget(
         MaterialApp(

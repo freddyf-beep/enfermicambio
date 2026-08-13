@@ -1,3 +1,5 @@
+import '../../../shared/text/text_encoding.dart';
+
 /// Notification categories for per-user preferences. The `dbKey` matches the
 /// keys stored in `profiles.notification_preferences` (jsonb); the server maps
 /// each notification type to exactly one category.
@@ -85,8 +87,8 @@ class AppNotification {
     return AppNotification(
       id: json['id'] as String,
       type: json['type'] as String,
-      title: json['title'] as String,
-      body: json['body'] as String,
+      title: repairMojibake(json['title'] as String),
+      body: repairMojibake(json['body'] as String),
       payload: (json['payload'] as Map?)?.cast<String, dynamic>() ?? const {},
       isRead: json['is_read'] as bool? ?? false,
       createdAt: DateTime.parse(json['created_at'] as String).toLocal(),

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../shared/ui/app_logo.dart';
 import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
@@ -19,6 +20,7 @@ import '../data/supabase_history_repository.dart';
 import '../data/supabase_profile_repository.dart';
 import '../domain/profile_history_stats.dart';
 import '../domain/profile_models.dart';
+import 'logo_settings_screen.dart';
 
 class AboutTab extends StatefulWidget {
   const AboutTab({super.key});
@@ -42,7 +44,14 @@ class _AboutTabState extends State<AboutTab> {
     _repository = SupabaseProfileRepository(client: Supabase.instance.client);
     _history = SupabaseHistoryRepository(client: Supabase.instance.client);
     _workouts = SupabaseWorkoutRepository(client: Supabase.instance.client);
+    _loadLogo();
     _load();
+  }
+
+  Future<void> _loadLogo() {
+    return AppLogoSelection.load(
+      userId: Supabase.instance.client.auth.currentUser?.id,
+    );
   }
 
   Future<void> _load() async {
@@ -88,6 +97,15 @@ class _AboutTabState extends State<AboutTab> {
         title: const Text('NOSOTROS'),
         actions: [
           IconButton(
+            tooltip: 'Personalizar logo',
+            icon: const Icon(Icons.palette_outlined),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const LogoSettingsScreen()),
+              );
+            },
+          ),
+          IconButton(
             tooltip: 'Permisos y Salud',
             icon: const Icon(
               Icons.health_and_safety_outlined,
@@ -109,6 +127,27 @@ class _AboutTabState extends State<AboutTab> {
             const SizedBox(height: 8),
             for (final profile in _profiles!)
               _ProfileTile(profile: profile, stats: _stats[profile.id]),
+            const SizedBox(height: 12),
+            Card(
+              child: ListTile(
+                leading: const AppLogo(size: 48, borderRadius: 12),
+                title: const Text(
+                  'Personalizar logo',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text(
+                  'Elige entre los cuatro logos de EnfermiCambio.',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const LogoSettingsScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
             const SizedBox(height: 24),
             const _SectionHeader(title: 'Mi Peso', icon: Icons.monitor_weight),
             const SizedBox(height: 8),
@@ -147,8 +186,26 @@ class _AboutTabState extends State<AboutTab> {
             const _NotificationPreferencesSection(),
             const SizedBox(height: 24),
             const _SectionHeader(
-              title: 'Entrenamientos Recientes',
+              title: 'Mis Entrenamientos',
               icon: Icons.fitness_center,
+            ),
+            const SizedBox(height: 8),
+            Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.sync_alt,
+                  color: AppColors.fitnessGreen,
+                ),
+                title: const Text(
+                  'Importación automática',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  defaultTargetPlatform == TargetPlatform.iOS
+                      ? 'Health Auto Export envía aquí tus carreras, caminatas, ciclismo y rutas.'
+                      : 'Health Connect envía aquí tus carreras, caminatas, ciclismo y rutas.',
+                ),
+              ),
             ),
             const SizedBox(height: 8),
             if (_recentWorkouts == null || _recentWorkouts!.isEmpty)
@@ -164,7 +221,7 @@ class _AboutTabState extends State<AboutTab> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Aún no hay entrenamientos registrados. Tus actividades de running, caminata o ciclismo aparecerán aquí automáticamente.',
+                          'Aún no hay entrenamientos registrados. Sincroniza el puente de salud y aparecerán aquí automáticamente.',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),
