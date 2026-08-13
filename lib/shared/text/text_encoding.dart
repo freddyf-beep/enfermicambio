@@ -11,7 +11,8 @@ String repairMojibake(String value) {
     final bytes = <int>[];
     for (final character in value.split('')) {
       final code = character.codeUnitAt(0);
-      final byte = _windows1252SpecialBytes[code] ?? (code <= 0xff ? code : null);
+      final byte =
+          _windows1252SpecialBytes[code] ?? (code <= 0xff ? code : null);
       if (byte == null) return value;
       bytes.add(byte);
     }

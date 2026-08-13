@@ -28,9 +28,6 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Generate launcher icon
-        run: dart run flutter_launcher_icons
-
       - name: Verify Dart code
         run: |
           dart format --output=none --set-exit-if-changed lib test

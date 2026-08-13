@@ -795,7 +795,9 @@ class _MissionCard extends StatelessWidget {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
-                        value: target <= 0 ? 0 : (value / target).clamp(0.0, 1.0),
+                        value: target <= 0
+                            ? 0
+                            : (value / target).clamp(0.0, 1.0),
                         backgroundColor: AppColors.darkSurfaceVariant,
                         color: AppColors.fitnessGreen,
                       ),
@@ -867,9 +869,9 @@ class _MissionCard extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 'Cómo se completa',
-                style: Theme.of(dialogContext).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  dialogContext,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               Text(
@@ -902,8 +904,10 @@ class _MissionCard extends StatelessWidget {
 
   String _metricLabel(String metric) {
     return switch (metric) {
-      'steps' || 'morning_steps' || 'afternoon_steps' || 'night_steps' =>
-        'pasos',
+      'steps' ||
+      'morning_steps' ||
+      'afternoon_steps' ||
+      'night_steps' => 'pasos',
       'distance_meters' || 'workout_distance_m' => 'distancia',
       'active_calories' => 'calorías activas',
       'exercise_minutes' => 'minutos de ejercicio',

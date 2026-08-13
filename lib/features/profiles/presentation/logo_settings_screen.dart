@@ -45,7 +45,9 @@ class LogoSettingsScreen extends StatelessWidget {
                         await AppLogoSelection.save(option.id, userId: userId);
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Logo cambiado a ${option.label}.')),
+                          SnackBar(
+                            content: Text('Logo cambiado a ${option.label}.'),
+                          ),
                         );
                       },
                       child: Padding(
@@ -79,9 +81,9 @@ class LogoSettingsScreen extends StatelessWidget {
                                       : Icons.radio_button_unchecked,
                                   color: selected
                                       ? AppColors.fitnessGreen
-                                      : Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
                                 ),
                               ],
                             ),

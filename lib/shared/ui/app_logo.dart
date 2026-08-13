@@ -58,7 +58,9 @@ class AppLogoSelection {
     final preferences = await SharedPreferences.getInstance();
     final key = _keyFor(userId);
     final selected = preferences.getString(key);
-    if (selected != null) current.value = AppLogos.byId(selected).id;
+    current.value = selected == null
+        ? AppLogos.options.first.id
+        : AppLogos.byId(selected).id;
   }
 
   static Future<void> save(String id, {String? userId}) async {

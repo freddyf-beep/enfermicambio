@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../shared/ui/app_tab_navigator.dart';
 import '../../../shared/ui/app_logo.dart';
+import '../../../shared/ui/app_tab_navigator.dart';
 import '../../activity/presentation/home_tab.dart';
 import '../../game/presentation/game_tab.dart';
 import '../../nutrition/presentation/register_tab.dart';
@@ -31,9 +30,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     AppTabNavigator.requests.addListener(_onTabRequest);
-    AppLogoSelection.load(
-      userId: Supabase.instance.client.auth.currentUser?.id,
-    );
+    AppLogoSelection.load();
   }
 
   @override

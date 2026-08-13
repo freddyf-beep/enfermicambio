@@ -3,7 +3,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/ui/app_logo.dart';
-import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
 
@@ -111,9 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Center(
-                  child: AppLogo(size: 104, borderRadius: 28),
-                ),
+                const Center(child: AppLogo(size: 104, borderRadius: 28)),
                 const SizedBox(height: 16),
                 Text(
                   'Enfermicambio',
