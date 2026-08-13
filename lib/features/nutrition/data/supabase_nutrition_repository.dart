@@ -61,6 +61,7 @@ class SupabaseNutritionRepository {
         .insert({
           'user_id': _userId,
           'food_id': entry.foodId,
+          'food_name_snapshot': entry.foodName,
           'logged_at': entry.loggedAt.toUtc().toIso8601String(),
           'meal_type': entry.mealType.name,
           'quantity': entry.quantity,
@@ -89,6 +90,51 @@ class SupabaseNutritionRepository {
       photoUrl: row['photo_url'] as String?,
     );
   }
+
+  /// Creates a new meal snapshot or updates an existing personal entry.
+  Future<FoodEntry> saveEntry(FoodEntry entry) =>
+      entry.id.isEmpty ? createEntry(entry) : updateEntry(entry);
+
+  Future<List<FoodEntry>> listEntriesForDay({DateTime? day}) async {
+    final target = day ?? DateTime.now();
+    final start = DateTime(target.year, target.month, target.day);
+    final end = start.add(const Duration(days: 1));
+    final rows = await _client
+        .from('food_entries')
+        .select()
+        .eq('user_id', _userId)
+        .gte('logged_at', start.toUtc().toIso8601String())
+        .lt('logged_at', end.toUtc().toIso8601String())
+        .order('logged_at', ascending: false);
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map(_entryFromRow)
+        .toList(growable: false);
+  }
+
+  Future<FoodEntry> updateEntry(FoodEntry entry) async {
+    final row = await _client
+        .from('food_entries')
+        .update({
+          'meal_type': entry.mealType.name,
+          'quantity': entry.quantity,
+          'unit': entry.unit,
+          'calories': entry.calories,
+          'protein_g': entry.proteinG,
+          'carbs_g': entry.carbsG,
+          'fat_g': entry.fatG,
+          'notes': null,
+          'food_name_snapshot': entry.foodName,
+        })
+        .eq('id', entry.id)
+        .eq('user_id', _userId)
+        .select()
+        .single();
+    return _entryFromRow(row);
+  }
+
+  Future<void> deleteEntry(String id) =>
+      _client.from('food_entries').delete().eq('id', id).eq('user_id', _userId);
 
   Future<List<Food>> searchFoods(String text) async {
     final query = text.trim();
@@ -131,4 +177,24 @@ class SupabaseNutritionRepository {
       source: row['source'] as String,
     );
   }
+
+  FoodEntry _entryFromRow(Map<String, dynamic> row) => FoodEntry(
+    id: row['id'] as String,
+    foodId: row['food_id'] as String?,
+    foodName: (row['food_name_snapshot'] as String?)?.trim().isNotEmpty == true
+        ? row['food_name_snapshot'] as String
+        : 'Alimento',
+    mealType: MealType.values.firstWhere(
+      (value) => value.name == row['meal_type'],
+      orElse: () => MealType.other,
+    ),
+    quantity: (row['quantity'] as num).toDouble(),
+    unit: row['unit'] as String,
+    calories: (row['calories'] as num).toDouble(),
+    proteinG: (row['protein_g'] as num).toDouble(),
+    carbsG: (row['carbs_g'] as num).toDouble(),
+    fatG: (row['fat_g'] as num).toDouble(),
+    photoUrl: row['photo_url'] as String?,
+    loggedAt: DateTime.parse(row['logged_at'] as String).toLocal(),
+  );
 }

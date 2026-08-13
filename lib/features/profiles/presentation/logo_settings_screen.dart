@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/ui/app_logo.dart';
 import '../../../shared/ui/app_theme.dart';
+import '../../../shared/platform/launcher_icon_service.dart';
 
 class LogoSettingsScreen extends StatelessWidget {
   const LogoSettingsScreen({super.key});
@@ -42,11 +43,16 @@ class LogoSettingsScreen extends StatelessWidget {
                         : null,
                     child: InkWell(
                       onTap: () async {
+                        if (userId == null) return;
                         await AppLogoSelection.save(option.id, userId: userId);
+                        final result = await const LauncherIconService()
+                            .setLogo(option.id);
                         if (!context.mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Logo cambiado a ${option.label}.'),
+                            content: Text(
+                              'Logo cambiado a ${option.label}. ${result.message}',
+                            ),
                           ),
                         );
                       },
@@ -98,7 +104,7 @@ class LogoSettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'El icono de la pantalla de inicio se actualiza en cada IPA nueva con el logo base. Este selector permite cambiar la identidad visual dentro de la app sin reinstalarla.',
+            'El cambio se guarda para tu usuario y también intenta actualizar el icono de inicio. En iPhone aparecerá una confirmación del sistema.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

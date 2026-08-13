@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/ui/app_logo.dart';
 import '../../../shared/ui/app_tab_navigator.dart';
@@ -30,7 +31,20 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     AppTabNavigator.requests.addListener(_onTabRequest);
-    AppLogoSelection.load();
+    final userId = _currentUserIdOrNull();
+    if (userId != null) {
+      AppLogoSelection.loadForUser(userId);
+    }
+  }
+
+  String? _currentUserIdOrNull() {
+    try {
+      return Supabase.instance.client.auth.currentUser?.id;
+    } on AssertionError {
+      // Widget tests inject only tabs and intentionally do not initialize
+      // Supabase. Production reaches this shell after the authenticated gate.
+      return null;
+    }
   }
 
   @override

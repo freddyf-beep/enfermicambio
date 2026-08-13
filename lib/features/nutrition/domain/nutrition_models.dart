@@ -56,6 +56,34 @@ class FoodEntry {
   final double fatG;
   final String? photoUrl;
   final DateTime loggedAt;
+
+  FoodEntry copyWith({
+    String? id,
+    String? foodId,
+    String? foodName,
+    MealType? mealType,
+    double? quantity,
+    String? unit,
+    double? calories,
+    double? proteinG,
+    double? carbsG,
+    double? fatG,
+    String? photoUrl,
+    DateTime? loggedAt,
+  }) => FoodEntry(
+    id: id ?? this.id,
+    foodId: foodId ?? this.foodId,
+    foodName: foodName ?? this.foodName,
+    mealType: mealType ?? this.mealType,
+    quantity: quantity ?? this.quantity,
+    unit: unit ?? this.unit,
+    calories: calories ?? this.calories,
+    proteinG: proteinG ?? this.proteinG,
+    carbsG: carbsG ?? this.carbsG,
+    fatG: fatG ?? this.fatG,
+    photoUrl: photoUrl ?? this.photoUrl,
+    loggedAt: loggedAt ?? this.loggedAt,
+  );
 }
 
 class DailyNutritionTotals {

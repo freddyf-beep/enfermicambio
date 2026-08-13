@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/ui/app_theme.dart';
 import '../../feed/data/supabase_post_repository.dart';
 import '../data/open_food_facts_repository.dart';
+import '../data/meal_media_repository.dart';
 import '../data/supabase_nutrition_repository.dart';
 import '../domain/nutrition_models.dart';
 import '../domain/nutrition_service.dart';
@@ -22,8 +24,12 @@ class RegisterTab extends StatefulWidget {
 class _RegisterTabState extends State<RegisterTab> {
   late final SupabasePostRepository _posts;
   late final SupabaseNutritionRepository _nutrition;
+  late final MealMediaRepository _mealMedia;
   final _foodResolver = OpenFoodFactsRepository();
   final _imagePicker = ImagePicker();
+  List<FoodEntry> _todayEntries = const [];
+  int _dailyTarget = 2200;
+  bool _loadingToday = true;
 
   @override
   void initState() {
@@ -31,6 +37,92 @@ class _RegisterTabState extends State<RegisterTab> {
     final client = Supabase.instance.client;
     _posts = SupabasePostRepository(client: client);
     _nutrition = SupabaseNutritionRepository(client: client);
+    _mealMedia = MealMediaRepository(client: client);
+    _loadToday();
+  }
+
+  Future<void> _loadToday() async {
+    try {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      final results = await Future.wait<Object>([
+        _nutrition.listEntriesForDay(),
+        if (userId != null)
+          Supabase.instance.client
+              .from('profiles')
+              .select('daily_calorie_target')
+              .eq('id', userId)
+              .single()
+        else
+          Future<Map<String, dynamic>>.value(const {}),
+      ]);
+      if (!mounted) return;
+      final profile = results[1] as Map<String, dynamic>;
+      setState(() {
+        _todayEntries = results[0] as List<FoodEntry>;
+        _dailyTarget =
+            (profile['daily_calorie_target'] as num?)?.toInt() ?? 2200;
+        _loadingToday = false;
+      });
+    } on Exception catch (error) {
+      if (!mounted) return;
+      setState(() => _loadingToday = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo cargar tu diario de comidas: $error'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteEntry(FoodEntry entry) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar comida'),
+        content: Text(
+          '¿Eliminar ${entry.foodName} de tu diario? Esto no elimina una publicación que ya hayas compartido.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    try {
+      await _nutrition.deleteEntry(entry.id);
+      await _loadToday();
+    } on Exception catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('No se pudo eliminar: $error')));
+      }
+    }
+  }
+
+  Future<void> _editEntry(FoodEntry entry) async {
+    final edited = await showDialog<FoodEntry>(
+      context: context,
+      builder: (_) => _EditFoodEntryDialog(entry: entry),
+    );
+    if (edited == null) return;
+    try {
+      await _nutrition.updateEntry(edited);
+      await _loadToday();
+    } on Exception catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('No se pudo editar: $error')));
+      }
+    }
   }
 
   Future<void> _createTextPost() async {
@@ -81,6 +173,34 @@ class _RegisterTabState extends State<RegisterTab> {
   }
 
   Future<void> _scanBarcode() async {
+    final permission = await Permission.camera.request();
+    if (!permission.isGranted) {
+      if (!mounted) return;
+      final wantsSettings = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Permiso de cámara'),
+          content: const Text(
+            'Activa la cámara para escanear códigos. También puedes ingresar el código manualmente.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Ahora no'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Abrir ajustes'),
+            ),
+          ],
+        ),
+      );
+      if (wantsSettings == true) {
+        await openAppSettings();
+      }
+      return;
+    }
+    if (!mounted) return;
     final barcode = await Navigator.of(context).push<String>(
       MaterialPageRoute(builder: (_) => BarcodeScanScreen(onResult: (_) {})),
     );
@@ -90,12 +210,14 @@ class _RegisterTabState extends State<RegisterTab> {
 
   Future<void> _resolveBarcode(String barcode) async {
     try {
-      final cached = await _nutrition.findByBarcode(barcode);
+      final normalized = OpenFoodFactsRepository.normalizeBarcode(barcode);
+      if (normalized == null) throw FoodLookupFailure.invalidBarcode;
+      final cached = await _nutrition.findByBarcode(normalized);
       if (cached != null) {
         if (mounted) await _showLogMealDialog(cached);
         return;
       }
-      final food = await _foodResolver.resolveByBarcode(barcode);
+      final food = await _foodResolver.resolveByBarcode(normalized);
       if (!mounted) return;
       await _showLogMealDialog(food);
     } on FoodLookupFailure catch (failure) {
@@ -222,8 +344,9 @@ class _RegisterTabState extends State<RegisterTab> {
         loggedAt: DateTime.now(),
       );
       final saved = await _nutrition.createEntry(entry);
+      await _loadToday();
       final userId = Supabase.instance.client.auth.currentSession?.user.id;
-      if (userId != null) {
+      if (userId != null && await _offerPublishMeal(saved)) {
         await _posts.createMealPost(
           authorId: userId,
           foodEntryId: saved.id,
@@ -244,6 +367,64 @@ class _RegisterTabState extends State<RegisterTab> {
         SnackBar(content: Text('No se pudo guardar la comida: $error')),
       );
     }
+  }
+
+  /// Returns false intentionally: legacy callers used to publish immediately
+  /// after logging. Publishing is now an explicit choice made here.
+  Future<bool> _offerPublishMeal(
+    FoodEntry entry, {
+    String? caption,
+    List<String> mediaUrls = const [],
+  }) async {
+    if (!mounted) return false;
+    final publish = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('¿Compartir con el grupo?'),
+        content: const Text(
+          'La comida ya se guardó en tu diario privado. Solo se verá en el feed si la compartes ahora.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Mantener privada'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Publicar'),
+          ),
+        ],
+      ),
+    );
+    if (publish != true) return false;
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return false;
+    try {
+      await _posts.createMealPost(
+        authorId: userId,
+        foodEntryId: entry.id,
+        mediaUrls: mediaUrls,
+        caption:
+            caption ??
+            '🍽️ ${entry.foodName} · ${entry.calories.round()} kcal · ${_mealLabel(entry.mealType)}',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Comida compartida en el feed.')),
+        );
+      }
+    } on Exception catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'La comida se guardó, pero no se pudo publicar: $error',
+            ),
+          ),
+        );
+      }
+    }
+    return false;
   }
 
   Future<Food?> _showCustomFoodModal({String? barcode}) async {
@@ -437,57 +618,104 @@ class _RegisterTabState extends State<RegisterTab> {
       source: source,
       imageQuality: 82,
       maxWidth: 1600,
+      maxHeight: 1600,
     );
     if (image == null || !mounted) return;
-
-    final captionController = TextEditingController();
-    final caption = await showDialog<String>(
+    final draft = await showDialog<_PhotoMealDraft>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Compartir comida'),
-        content: TextField(
-          controller: captionController,
-          maxLines: 3,
-          maxLength: 500,
-          decoration: const InputDecoration(
-            hintText: '¿Qué comiste? Puedes añadir calorías o macros.',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.pop(dialogContext, captionController.text.trim()),
-            child: const Text('Publicar'),
-          ),
-        ],
-      ),
+      builder: (_) => const _PhotoMealDialog(),
     );
-    captionController.dispose();
-    if (caption == null || !mounted) return;
-
-    final userId = Supabase.instance.client.auth.currentSession?.user.id;
+    if (draft == null || !mounted) return;
+    final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId == null) return;
+
+    FoodEntry saved;
     try {
-      await _posts.uploadPhotoPost(
-        authorId: userId,
-        caption: caption.isEmpty ? '🍽️ Comida registrada' : caption,
+      saved = await _nutrition.createEntry(
+        FoodEntry(
+          id: '',
+          foodName: draft.name,
+          mealType: draft.mealType,
+          quantity: 1,
+          unit: 'porción',
+          calories: draft.calories,
+          proteinG: draft.proteinG,
+          carbsG: draft.carbsG,
+          fatG: draft.fatG,
+          loggedAt: DateTime.now(),
+        ),
+      );
+    } on Exception catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo guardar la comida: $error')),
+        );
+      }
+      return;
+    }
+
+    late final MealMediaUpload upload;
+    try {
+      upload = await _mealMedia.uploadWithRetry(
+        userId: userId,
         filePath: image.path,
         contentType: image.mimeType ?? 'image/jpeg',
       );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Foto publicada en el feed.')),
+      saved = await _nutrition.updateEntry(
+        saved.copyWith(photoUrl: upload.reference),
       );
+    } on Exception {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'La comida se guardó, pero la foto no pudo subir. Inténtalo otra vez desde el diario.',
+            ),
+            action: SnackBarAction(
+              label: 'Reintentar',
+              onPressed: () => _retryPhoto(saved, image),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+
+    await _offerPublishMeal(
+      saved,
+      caption: draft.caption.isEmpty
+          ? '🍽️ ${draft.name} · ${draft.calories.round()} kcal'
+          : draft.caption,
+      mediaUrls: [upload.reference],
+    );
+    await _loadToday();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Comida y foto guardadas en tu diario.')),
+      );
+    }
+  }
+
+  Future<void> _retryPhoto(FoodEntry entry, XFile image) async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
+    try {
+      final upload = await _mealMedia.uploadWithRetry(
+        userId: userId,
+        filePath: image.path,
+        contentType: image.mimeType ?? 'image/jpeg',
+      );
+      final saved = await _nutrition.updateEntry(
+        entry.copyWith(photoUrl: upload.reference),
+      );
+      await _loadToday();
+      await _offerPublishMeal(saved, mediaUrls: [upload.reference]);
     } on Exception catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo publicar la foto: $error')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('La foto sigue pendiente: $error')),
+        );
+      }
     }
   }
 
@@ -509,6 +737,15 @@ class _RegisterTabState extends State<RegisterTab> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          _TodayNutritionCard(
+            entries: _todayEntries,
+            targetCalories: _dailyTarget,
+            loading: _loadingToday,
+            onDelete: _deleteEntry,
+            onEdit: _editEntry,
+            onRefresh: _loadToday,
+          ),
+          const SizedBox(height: 16),
           _ActionCard(
             icon: Icons.qr_code_scanner,
             title: 'Escanear código de barras',
@@ -591,6 +828,184 @@ class _MealSelection {
 
   final MealType mealType;
   final double servings;
+}
+
+class _PhotoMealDraft {
+  const _PhotoMealDraft({
+    required this.name,
+    required this.mealType,
+    required this.calories,
+    required this.proteinG,
+    required this.carbsG,
+    required this.fatG,
+    required this.caption,
+  });
+
+  final String name;
+  final MealType mealType;
+  final double calories;
+  final double proteinG;
+  final double carbsG;
+  final double fatG;
+  final String caption;
+}
+
+class _PhotoMealDialog extends StatefulWidget {
+  const _PhotoMealDialog();
+
+  @override
+  State<_PhotoMealDialog> createState() => _PhotoMealDialogState();
+}
+
+class _PhotoMealDialogState extends State<_PhotoMealDialog> {
+  final _name = TextEditingController();
+  final _calories = TextEditingController();
+  final _protein = TextEditingController(text: '0');
+  final _carbs = TextEditingController(text: '0');
+  final _fat = TextEditingController(text: '0');
+  final _caption = TextEditingController();
+  MealType _mealType = MealType.lunch;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _calories.dispose();
+    _protein.dispose();
+    _carbs.dispose();
+    _fat.dispose();
+    _caption.dispose();
+    super.dispose();
+  }
+
+  double? _number(String value) =>
+      double.tryParse(value.trim().replaceAll(',', '.'));
+
+  void _save() {
+    final name = _name.text.trim();
+    final calories = _number(_calories.text);
+    final protein = _number(_protein.text) ?? 0;
+    final carbs = _number(_carbs.text) ?? 0;
+    final fat = _number(_fat.text) ?? 0;
+    if (name.isEmpty ||
+        calories == null ||
+        calories < 0 ||
+        protein < 0 ||
+        carbs < 0 ||
+        fat < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Agrega el nombre y calorías válidas. Los macros no pueden ser negativos.',
+          ),
+        ),
+      );
+      return;
+    }
+    Navigator.pop(
+      context,
+      _PhotoMealDraft(
+        name: name,
+        mealType: _mealType,
+        calories: calories,
+        proteinG: protein,
+        carbsG: carbs,
+        fatG: fat,
+        caption: _caption.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Registrar comida con foto'),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _name,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: '¿Qué comiste? *'),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<MealType>(
+            initialValue: _mealType,
+            decoration: const InputDecoration(labelText: 'Momento'),
+            items: const [
+              DropdownMenuItem(
+                value: MealType.breakfast,
+                child: Text('Desayuno'),
+              ),
+              DropdownMenuItem(value: MealType.lunch, child: Text('Almuerzo')),
+              DropdownMenuItem(value: MealType.dinner, child: Text('Cena')),
+              DropdownMenuItem(value: MealType.snack, child: Text('Snack')),
+              DropdownMenuItem(value: MealType.other, child: Text('Otro')),
+            ],
+            onChanged: (value) => setState(() => _mealType = value!),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _calories,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Calorías *',
+              suffixText: 'kcal',
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _protein,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'Proteínas (g)'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _carbs,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'Carbos (g)'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _fat,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'Grasas (g)'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _caption,
+            maxLength: 500,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              labelText: 'Texto para el feed (opcional)',
+            ),
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton(onPressed: _save, child: const Text('Guardar comida')),
+    ],
+  );
 }
 
 class _FoodSearchDialog extends StatefulWidget {
@@ -686,6 +1101,325 @@ class _FoodSearchDialogState extends State<_FoodSearchDialog> {
       ],
     );
   }
+}
+
+class _EditFoodEntryDialog extends StatefulWidget {
+  const _EditFoodEntryDialog({required this.entry});
+  final FoodEntry entry;
+
+  @override
+  State<_EditFoodEntryDialog> createState() => _EditFoodEntryDialogState();
+}
+
+class _EditFoodEntryDialogState extends State<_EditFoodEntryDialog> {
+  late final TextEditingController _name;
+  late final TextEditingController _quantity;
+  late final TextEditingController _calories;
+  late final TextEditingController _protein;
+  late final TextEditingController _carbs;
+  late final TextEditingController _fat;
+  late MealType _mealType;
+
+  @override
+  void initState() {
+    super.initState();
+    final entry = widget.entry;
+    _name = TextEditingController(text: entry.foodName);
+    _quantity = TextEditingController(text: entry.quantity.toString());
+    _calories = TextEditingController(text: entry.calories.toString());
+    _protein = TextEditingController(text: entry.proteinG.toString());
+    _carbs = TextEditingController(text: entry.carbsG.toString());
+    _fat = TextEditingController(text: entry.fatG.toString());
+    _mealType = entry.mealType;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _quantity.dispose();
+    _calories.dispose();
+    _protein.dispose();
+    _carbs.dispose();
+    _fat.dispose();
+    super.dispose();
+  }
+
+  double? _number(String value) =>
+      double.tryParse(value.trim().replaceAll(',', '.'));
+
+  void _save() {
+    final name = _name.text.trim();
+    final quantity = _number(_quantity.text);
+    final calories = _number(_calories.text);
+    final protein = _number(_protein.text);
+    final carbs = _number(_carbs.text);
+    final fat = _number(_fat.text);
+    if (name.isEmpty ||
+        quantity == null ||
+        quantity <= 0 ||
+        calories == null ||
+        calories < 0 ||
+        protein == null ||
+        protein < 0 ||
+        carbs == null ||
+        carbs < 0 ||
+        fat == null ||
+        fat < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Revisa nombre, cantidad, calorías y macros.'),
+        ),
+      );
+      return;
+    }
+    Navigator.pop(
+      context,
+      widget.entry.copyWith(
+        foodName: name,
+        quantity: quantity,
+        calories: calories,
+        proteinG: protein,
+        carbsG: carbs,
+        fatG: fat,
+        mealType: _mealType,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Editar comida'),
+    content: SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _name,
+            decoration: const InputDecoration(labelText: 'Nombre'),
+          ),
+          DropdownButtonFormField<MealType>(
+            initialValue: _mealType,
+            decoration: const InputDecoration(labelText: 'Momento'),
+            items: const [
+              DropdownMenuItem(
+                value: MealType.breakfast,
+                child: Text('Desayuno'),
+              ),
+              DropdownMenuItem(value: MealType.lunch, child: Text('Almuerzo')),
+              DropdownMenuItem(value: MealType.dinner, child: Text('Cena')),
+              DropdownMenuItem(value: MealType.snack, child: Text('Snack')),
+              DropdownMenuItem(value: MealType.other, child: Text('Otro')),
+            ],
+            onChanged: (value) => setState(() => _mealType = value!),
+          ),
+          TextField(
+            controller: _quantity,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'Cantidad (${widget.entry.unit})',
+            ),
+          ),
+          TextField(
+            controller: _calories,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Calorías'),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _protein,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'P g'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _carbs,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'C g'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _fat,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'G g'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Cancelar'),
+      ),
+      FilledButton(onPressed: _save, child: const Text('Guardar')),
+    ],
+  );
+}
+
+class _TodayNutritionCard extends StatelessWidget {
+  const _TodayNutritionCard({
+    required this.entries,
+    required this.targetCalories,
+    required this.loading,
+    required this.onDelete,
+    required this.onEdit,
+    required this.onRefresh,
+  });
+
+  final List<FoodEntry> entries;
+  final int targetCalories;
+  final bool loading;
+  final ValueChanged<FoodEntry> onDelete;
+  final ValueChanged<FoodEntry> onEdit;
+  final Future<void> Function() onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    final totals = const NutritionService().totalsForDay(
+      entries: entries,
+      targetCalories: targetCalories.toDouble(),
+    );
+    final remaining = totals.remainingCalories;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.restaurant_outlined,
+                  color: AppColors.macroCarbs,
+                ),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Mi alimentación de hoy',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ),
+                IconButton(
+                  onPressed: loading ? null : onRefresh,
+                  icon: const Icon(Icons.refresh),
+                  tooltip: 'Actualizar diario',
+                ),
+              ],
+            ),
+            if (loading)
+              const Padding(
+                padding: EdgeInsets.all(12),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else ...[
+              const SizedBox(height: 8),
+              Text(
+                '${totals.calories.round()} kcal consumidas de $targetCalories kcal',
+              ),
+              const SizedBox(height: 6),
+              LinearProgressIndicator(
+                value: targetCalories <= 0
+                    ? 0
+                    : (totals.calories / targetCalories).clamp(0.0, 1.0),
+                color: remaining >= 0
+                    ? AppColors.fitnessGreen
+                    : AppColors.streakOrange,
+                minHeight: 8,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                remaining >= 0
+                    ? 'Presupuesto restante: ${remaining.round()} kcal'
+                    : 'Llevas ${remaining.abs().round()} kcal sobre tu presupuesto',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: remaining >= 0
+                      ? AppColors.fitnessGreen
+                      : AppColors.streakOrange,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'P ${totals.proteinG.round()} g · C ${totals.carbsG.round()} g · G ${totals.fatG.round()} g',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              if (entries.isEmpty)
+                const Text(
+                  'Aún no registras comidas hoy. Escanea, busca o crea una comida.',
+                )
+              else
+                for (final entry in entries)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      entry.photoUrl == null
+                          ? Icons.restaurant
+                          : Icons.photo_camera,
+                      color: AppColors.macroCarbs,
+                    ),
+                    title: Text(
+                      entry.foodName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      '${_mealTypeText(entry.mealType)} · ${entry.quantity.toStringAsFixed(entry.quantity % 1 == 0 ? 0 : 1)} ${entry.unit}',
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '${entry.calories.round()} kcal',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined),
+                          tooltip: 'Editar',
+                          onPressed: () => onEdit(entry),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          tooltip: 'Eliminar',
+                          onPressed: () => onDelete(entry),
+                        ),
+                      ],
+                    ),
+                  ),
+              const SizedBox(height: 6),
+              const Text(
+                'Estimación orientativa; no equivale a un diagnóstico ni a déficit metabólico real.',
+                style: TextStyle(fontSize: 11),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _mealTypeText(MealType value) => switch (value) {
+    MealType.breakfast => 'Desayuno',
+    MealType.lunch => 'Almuerzo',
+    MealType.dinner => 'Cena',
+    MealType.snack => 'Snack',
+    MealType.other => 'Otro',
+  };
 }
 
 class _ActionCard extends StatelessWidget {

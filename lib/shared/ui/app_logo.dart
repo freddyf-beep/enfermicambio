@@ -54,7 +54,7 @@ class AppLogoSelection {
     AppLogos.options.first.id,
   );
 
-  static Future<void> load({String? userId}) async {
+  static Future<void> loadForUser(String userId) async {
     final preferences = await SharedPreferences.getInstance();
     final key = _keyFor(userId);
     final selected = preferences.getString(key);
@@ -63,17 +63,14 @@ class AppLogoSelection {
         : AppLogos.byId(selected).id;
   }
 
-  static Future<void> save(String id, {String? userId}) async {
+  static Future<void> save(String id, {required String userId}) async {
     final selected = AppLogos.byId(id).id;
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_keyFor(userId), selected);
     current.value = selected;
   }
 
-  static String _keyFor(String? userId) {
-    final suffix = userId == null || userId.isEmpty ? 'device' : userId;
-    return 'enfermicambio_logo_$suffix';
-  }
+  static String _keyFor(String userId) => 'enfermicambio_logo_$userId';
 }
 
 class AppLogo extends StatelessWidget {

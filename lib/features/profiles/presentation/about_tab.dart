@@ -10,6 +10,7 @@ import '../../app/data/health_sync_bootstrap.dart';
 import '../../health/data/health_plugin_repository.dart';
 import '../../health/presentation/health_setup_screen.dart';
 import '../../health/presentation/health_auto_export_setup_screen.dart';
+import '../../nutrition/presentation/calorie_plan_screen.dart';
 import '../../notifications/data/supabase_notification_repository.dart';
 import '../../notifications/domain/notification_models.dart';
 import '../../weight/presentation/weight_screen.dart';
@@ -44,14 +45,7 @@ class _AboutTabState extends State<AboutTab> {
     _repository = SupabaseProfileRepository(client: Supabase.instance.client);
     _history = SupabaseHistoryRepository(client: Supabase.instance.client);
     _workouts = SupabaseWorkoutRepository(client: Supabase.instance.client);
-    _loadLogo();
     _load();
-  }
-
-  Future<void> _loadLogo() {
-    return AppLogoSelection.load(
-      userId: Supabase.instance.client.auth.currentUser?.id,
-    );
   }
 
   Future<void> _load() async {
@@ -146,6 +140,26 @@ class _AboutTabState extends State<AboutTab> {
                     ),
                   );
                 },
+              ),
+            ),
+            const SizedBox(height: 8),
+            Card(
+              child: ListTile(
+                leading: const Icon(
+                  Icons.local_fire_department_outlined,
+                  color: AppColors.macroCarbs,
+                ),
+                title: const Text(
+                  'Plan de calorías',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: const Text(
+                  'Meta personalizada con altura, peso y actividad.',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CaloriePlanScreen()),
+                ),
               ),
             ),
             const SizedBox(height: 24),

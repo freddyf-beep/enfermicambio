@@ -7,6 +7,8 @@ import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
 import '../../profiles/data/supabase_profile_repository.dart';
+import '../../nutrition/data/supabase_nutrition_profile_repository.dart';
+import '../../nutrition/domain/nutrition_profile.dart';
 import '../data/supabase_weight_repository.dart';
 import '../domain/weight_models.dart';
 
@@ -120,6 +122,19 @@ class _WeightScreenState extends State<WeightScreen> {
         date: DateTime.parse(AppEnvironment.todayInCompetitionTz()),
         weightKg: value,
       );
+      final nutrition = SupabaseNutritionProfileRepository(
+        client: Supabase.instance.client,
+      );
+      final profile = await nutrition.load();
+      if (profile != null) {
+        final plan = const CaloriePlanner().calculate(
+          profile: profile,
+          weightKg: value,
+        );
+        if (plan.target != null) {
+          await nutrition.saveCalculatedDailyTarget(plan.target!);
+        }
+      }
       await _repository.notifyGoalIfMet();
       await _load();
     } on Exception {

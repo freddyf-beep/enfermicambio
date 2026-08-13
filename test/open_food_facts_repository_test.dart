@@ -41,7 +41,7 @@ void main() {
 
     expect(food.name, 'Nutella');
     expect(food.brand, 'Ferrero');
-    expect(food.source, 'offer');
+    expect(food.source, 'open_food_facts');
     expect(food.calories, closeTo(81, 0.01));
     expect(food.servingSize, closeTo(15, 0.01));
   });
@@ -56,7 +56,8 @@ void main() {
     });
 
     expect(
-      () => OpenFoodFactsRepository(client: client).resolveByBarcode('999'),
+      () =>
+          OpenFoodFactsRepository(client: client).resolveByBarcode('99999999'),
       throwsA(FoodLookupFailure.notFound),
     );
   });
@@ -75,7 +76,7 @@ void main() {
       () => OpenFoodFactsRepository(
         client: client,
         timeout: const Duration(milliseconds: 50),
-      ).resolveByBarcode('123'),
+      ).resolveByBarcode('12345678'),
       throwsA(FoodLookupFailure.timeout),
     );
   });
@@ -90,8 +91,40 @@ void main() {
     });
 
     expect(
-      () => OpenFoodFactsRepository(client: client).resolveByBarcode('123'),
+      () =>
+          OpenFoodFactsRepository(client: client).resolveByBarcode('12345678'),
       throwsA(FoodLookupFailure.malformed),
     );
+  });
+
+  test('normalizes valid EAN/UPC codes and rejects invalid values', () {
+    expect(
+      OpenFoodFactsRepository.normalizeBarcode(' 1234-5678-9012 '),
+      '123456789012',
+    );
+    expect(OpenFoodFactsRepository.normalizeBarcode('12345ABC'), isNull);
+    expect(OpenFoodFactsRepository.normalizeBarcode('1234567'), isNull);
+  });
+
+  test('scales 100 gram nutrition to the configured serving', () async {
+    final client = MockClient(
+      (_) async => http.Response(
+        jsonEncode({
+          'status': 1,
+          'product': {
+            'product_name': 'Galletas',
+            'serving_quantity': 30,
+            'serving_quantity_unit': 'g',
+            'nutriments': {'energy-kcal_100g': 500, 'proteins_100g': 10},
+          },
+        }),
+        200,
+      ),
+    );
+    final food = await OpenFoodFactsRepository(
+      client: client,
+    ).resolveByBarcode('12345678');
+    expect(food.calories, 150);
+    expect(food.proteinG, 3);
   });
 }

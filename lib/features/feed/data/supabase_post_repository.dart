@@ -58,6 +58,7 @@ class SupabasePostRepository {
     required String authorId,
     required String caption,
     required String foodEntryId,
+    List<String> mediaUrls = const [],
   }) async {
     final row = await _client
         .from('posts')
@@ -70,7 +71,19 @@ class SupabasePostRepository {
         })
         .select('id')
         .single();
-    return row['id'] as String;
+    final postId = row['id'] as String;
+    if (mediaUrls.isNotEmpty) {
+      await _client.from('post_media').insert([
+        for (var i = 0; i < mediaUrls.length; i++)
+          {
+            'post_id': postId,
+            'url': mediaUrls[i],
+            'media_type': 'image',
+            'sort_order': i,
+          },
+      ]);
+    }
+    return postId;
   }
 
   /// Uploads a private image and stores a bucket/path reference in

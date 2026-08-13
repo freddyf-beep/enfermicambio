@@ -32,6 +32,27 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>enfermicambio</string>
+	<key>CFBundleIcons</key>
+	<dict>
+		<key>CFBundleAlternateIcons</key>
+		<dict>
+			<key>AppIconRedTransparent</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array><string>AppIconRedTransparent</string></array>
+			</dict>
+			<key>AppIconRedCropped</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array><string>AppIconRedCropped</string></array>
+			</dict>
+			<key>AppIconMedicalCropped</key>
+			<dict>
+				<key>CFBundleIconFiles</key>
+				<array><string>AppIconMedicalCropped</string></array>
+			</dict>
+		</dict>
+	</dict>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

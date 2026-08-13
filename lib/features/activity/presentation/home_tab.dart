@@ -359,6 +359,10 @@ class _HomeTabState extends State<HomeTab> {
             const SizedBox(height: 8),
             FeedList(
               posts: data.feedPage.posts,
+              errorMessage: data.feedError == null
+                  ? null
+                  : 'El resumen y ranking siguen disponibles. Detalle: ${data.feedError}',
+              onRetry: _load,
               onReact: _react,
               onComment: _comment,
             ),

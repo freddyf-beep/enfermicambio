@@ -13,11 +13,13 @@ class AppDashboardData {
     required this.ranking,
     required this.feedPage,
     required this.me,
+    this.feedError,
   });
 
   final List<RankingRow> ranking;
   final FeedPage feedPage;
   final DailyActivityAggregate? me;
+  final Object? feedError;
 }
 
 class DashboardRepository {
@@ -51,7 +53,7 @@ class DashboardRepository {
           'source_metadata',
         )
         .eq('activity_date', activityDate);
-    final feedFuture = _feed.loadLatest(limit: 20);
+    final feedFuture = _loadFeedSafely();
 
     final results = await Future.wait<Object>([
       profilesFuture,
@@ -61,7 +63,7 @@ class DashboardRepository {
 
     final profiles = results[0] as List<dynamic>;
     final activityRows = results[1] as List<dynamic>;
-    final feedPage = results[2] as FeedPage;
+    final feedResult = results[2] as _FeedResult;
 
     final activityByUser = <String, Map<String, dynamic>>{};
 
@@ -119,7 +121,23 @@ class DashboardRepository {
                 const {},
           );
 
-    return AppDashboardData(ranking: ranking, feedPage: feedPage, me: me);
+    return AppDashboardData(
+      ranking: ranking,
+      feedPage: feedResult.page,
+      me: me,
+      feedError: feedResult.error,
+    );
+  }
+
+  Future<_FeedResult> _loadFeedSafely() async {
+    try {
+      return _FeedResult(page: await _feed.loadLatest(limit: 20));
+    } on Object catch (error) {
+      return _FeedResult(
+        page: const FeedPage(posts: [], nextCursor: null),
+        error: error,
+      );
+    }
   }
 
   DateTime _syncedAt(Map<String, dynamic> row) {
@@ -134,4 +152,11 @@ class DashboardRepository {
         '${value.month.toString().padLeft(2, '0')}-'
         '${value.day.toString().padLeft(2, '0')}';
   }
+}
+
+class _FeedResult {
+  const _FeedResult({required this.page, this.error});
+
+  final FeedPage page;
+  final Object? error;
 }

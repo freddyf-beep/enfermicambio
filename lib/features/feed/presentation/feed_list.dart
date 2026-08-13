@@ -13,6 +13,8 @@ class FeedList extends StatelessWidget {
     this.isLoadingMore = false,
     this.onReact,
     this.onComment,
+    this.errorMessage,
+    this.onRetry,
   });
 
   final List<FeedPost> posts;
@@ -21,9 +23,41 @@ class FeedList extends StatelessWidget {
   final bool isLoadingMore;
   final void Function(FeedPost post)? onReact;
   final void Function(FeedPost post)? onComment;
+  final String? errorMessage;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
+    if (errorMessage != null) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.cloud_off_outlined,
+                size: 42,
+                color: AppColors.streakOrange,
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'El feed no se pudo cargar por ahora.',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Text(errorMessage!, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Reintentar'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     if (posts.isEmpty) {
       return Card(
         child: Padding(
