@@ -32,6 +32,7 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+/artifacts/
 
 # Downloaded source references stay available locally. Only their catalog is
 # versioned so nested repositories and third-party histories are never bundled.
