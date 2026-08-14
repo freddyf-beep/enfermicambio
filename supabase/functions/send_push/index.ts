@@ -31,7 +31,12 @@ type NtfyDevice = {
   server_url: string;
   provider: "ntfy";
 };
-type PushDevice = NativePushDevice | WebPushDevice | NtfyDevice;
+type BarkDevice = {
+  device_key: string;
+  server_url: string;
+  provider: "bark";
+};
+type PushDevice = NativePushDevice | WebPushDevice | NtfyDevice | BarkDevice;
 type DeliveryResult = { ok: boolean; permanent: boolean; error?: string };
 
 let fcmAccessToken: { value: string; expiresAt: number } | null = null;
@@ -171,7 +176,12 @@ async function sendFcm(
           },
           android: {
             priority: "high",
-            notification: { channel_id: "competencia", sound: "default" },
+            notification: {
+              channel_id: "competencia",
+              sound: "default",
+              icon: "ic_stat_notification",
+              color: "#B6FF00",
+            },
           },
         },
       }),
@@ -372,6 +382,109 @@ async function sendNtfy(
   };
 }
 
+function barkBaseUrl(): string {
+  const configured = env("BARK_BASE_URL") || "https://api.day.app";
+  const parsed = new URL(configured);
+  if (parsed.protocol !== "https:") {
+    throw new Error("BARK_BASE_URL debe usar HTTPS");
+  }
+  return parsed.toString().replace(/\/$/, "");
+}
+
+function barkNotificationIcon(): string | undefined {
+  const configured = env("BARK_NOTIFICATION_ICON");
+  if (!configured) return undefined;
+  try {
+    const parsed = new URL(configured);
+    return parsed.protocol === "https:" ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function barkSenderLabel(notification: NotificationRow): string {
+  const payload = jsonObject(notification.payload);
+  const configured = payload.sender_name ?? payload.actor_name;
+  if (typeof configured === "string" && configured.trim()) {
+    return configured.trim();
+  }
+
+  const title = notification.title.trim();
+  if (["feed_post", "comment", "reaction"].includes(notification.type)) {
+    const socialMatch = title.match(/^(.*?)\s+(publicó|comentó|reaccionó)$/i);
+    if (socialMatch?.[1]?.trim()) return socialMatch[1].trim();
+    if (title && !title.startsWith("¡")) return title;
+  }
+  if (notification.type === "overtake" || notification.type === "leader_change") {
+    const competitionMatch = title.match(/^(.*?)\s+(te pasó|tomó el primer lugar)$/i);
+    if (competitionMatch?.[1]?.trim()) return competitionMatch[1].trim();
+  }
+  if (notification.type === "round_result") {
+    const roundMatch = title.match(/^(.*?)\s+(ganó la ronda|se lleva el día)$/i);
+    if (roundMatch?.[1]?.trim()) return roundMatch[1].trim();
+  }
+  return "Sistema";
+}
+
+function barkNotificationBody(notification: NotificationRow): string {
+  return `${barkSenderLabel(notification)}\n${notification.body}`;
+}
+
+async function sendBark(
+  device: BarkDevice,
+  notification: NotificationRow,
+): Promise<DeliveryResult> {
+  if (!/^[A-Za-z0-9_-]{8,128}$/.test(device.device_key)) {
+    return { ok: false, permanent: true, error: "Clave Bark inválida" };
+  }
+
+  let baseUrl: string;
+  try {
+    baseUrl = barkBaseUrl();
+    const configuredUrl = new URL(baseUrl);
+    const rowUrl = new URL(device.server_url);
+    if (
+      rowUrl.protocol !== "https:" ||
+      rowUrl.hostname !== configuredUrl.hostname
+    ) {
+      return { ok: false, permanent: false, error: "Servidor Bark no autorizado" };
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      permanent: false,
+      error: `Configuración Bark inválida: ${String(error).slice(0, 300)}`,
+    };
+  }
+
+  const icon = barkNotificationIcon();
+  const response = await fetch(
+    `${baseUrl}/${encodeURIComponent(device.device_key)}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify({
+        title: "EnfermiCambio",
+        body: barkNotificationBody(notification),
+        group: "EnfermiCambio",
+        id: notification.id,
+        ...(icon ? { icon } : {}),
+      }),
+    },
+  );
+  if (response.ok) return { ok: true, permanent: false };
+  const errorBody = await response.text();
+  const permanent = response.status === 400 ||
+    response.status === 401 ||
+    response.status === 403 ||
+    response.status === 404;
+  return {
+    ok: false,
+    permanent,
+    error: `Bark ${response.status}: ${errorBody.slice(0, 500)}`,
+  };
+}
+
 async function sendToDevice(
   device: PushDevice,
   notification: NotificationRow,
@@ -381,6 +494,9 @@ async function sendToDevice(
   }
   if (device.provider === "ntfy") {
     return sendNtfy(device, notification);
+  }
+  if (device.provider === "bark") {
+    return sendBark(device, notification);
   }
   return device.provider === "apns"
     ? sendApns(device, notification)
@@ -406,7 +522,7 @@ async function processOutbox(
     return { success: true, sent: 0, disabled: 0 };
   }
 
-  const [nativeResult, webResult, ntfyResult] = await Promise.all([
+  const [nativeResult, webResult, ntfyResult, barkResult] = await Promise.all([
     supabaseAdmin
       .from("push_devices")
       .select("token, platform, provider, app_id")
@@ -422,10 +538,19 @@ async function processOutbox(
       .select("topic, server_url")
       .eq("user_id", outbox.user_id)
       .eq("enabled", true),
+    supabaseAdmin.rpc("list_bark_devices_for_dispatch", {
+      p_user_id: outbox.user_id,
+    }),
   ]);
   if (nativeResult.error) throw new Error(nativeResult.error.message);
   if (webResult.error) throw new Error(webResult.error.message);
   if (ntfyResult.error) throw new Error(ntfyResult.error.message);
+  if (barkResult.error) throw new Error(barkResult.error.message);
+
+  const barkDevices = (barkResult.data ?? []) as Array<
+    Omit<BarkDevice, "provider">
+  >;
+  const barkIsActive = barkDevices.length > 0;
 
   const devices: PushDevice[] = [
     ...((nativeResult.data ?? []) as NativePushDevice[]),
@@ -433,9 +558,17 @@ async function processOutbox(
       ...device,
       provider: "web" as const,
     })),
-    ...((ntfyResult.data ?? []) as Array<Omit<NtfyDevice, "provider">>).map((device) => ({
+    ...(barkIsActive
+      ? []
+      : ((ntfyResult.data ?? []) as Array<Omit<NtfyDevice, "provider">>).map(
+          (device) => ({
+            ...device,
+            provider: "ntfy" as const,
+          }),
+        )),
+    ...barkDevices.map((device) => ({
       ...device,
-      provider: "ntfy" as const,
+      provider: "bark" as const,
     })),
   ];
 
@@ -473,6 +606,12 @@ async function processOutbox(
               .update({ enabled: false, updated_at: new Date().toISOString() })
               .eq("user_id", outbox.user_id)
               .eq("topic", device.topic);
+          } else if (device.provider === "bark") {
+            await supabaseAdmin
+              .from("bark_devices")
+              .update({ enabled: false, updated_at: new Date().toISOString() })
+              .eq("user_id", outbox.user_id)
+              .eq("device_key", device.device_key);
           } else {
             await supabaseAdmin
               .from("push_devices")

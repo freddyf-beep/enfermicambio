@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -38,7 +39,12 @@ Future<void> main() async {
         publishableKey: AppEnvironment.supabaseAnonKey,
       );
       unawaited(NotificationDeliveryCoordinator.ensure().start());
-      unawaited(PushNotificationService.ensure().start());
+      // iPhone uses Bark as the external notification bridge. Avoid starting
+      // Firebase Messaging there so the UI does not report a misleading APNs
+      // token error. Android keeps the native FCM registration.
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        unawaited(PushNotificationService.ensure().start());
+      }
     } on Exception {
       // A backend failure must never blank the screen; the auth gate will
       // surface an offline/error state instead.
@@ -54,7 +60,7 @@ class EnfermicambioApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Enfermicambio',
+      title: 'EnfermiCambio',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,

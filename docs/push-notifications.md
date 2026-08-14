@@ -148,6 +148,16 @@ Si se escoge un puente externo, solo se pide la credencial de ese proveedor:
 La aplicación debe seguir funcionando aunque esos secretos falten: se mantiene
 la campana interna, Realtime y las notificaciones locales mientras el proceso
 está abierto.
+### Bark como puente en migraciÃ³n
+
+La app tambiÃ©n integra Bark como alternativa nativa para iPhone. Bark se
+configura desde `Nosotros â†’ Notificaciones â†’ Configurar Bark`: el usuario
+pega la URL de prueba que copia desde Bark y la clave queda guardada en la
+tabla privada `bark_devices`. Cuando Bark estÃ¡ activo para un usuario, el
+servidor omite ntfy para evitar duplicados. ntfy no se elimina hasta validar
+los cuatro telÃ©fonos. El procedimiento completo estÃ¡ en
+[`docs/bark_bridge.md`](bark_bridge.md).
+
 ## Puente Web Push para iPhone
 
 Cuando una IPA está instalada con una firma gratuita o con un perfil que no

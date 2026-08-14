@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -28,7 +29,7 @@ class FlutterLocalNotificationService implements LocalNotificationService {
   Future<void> initialize() async {
     if (_initialized || kIsWeb) return;
     const settings = InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      android: AndroidInitializationSettings('ic_stat_notification'),
       iOS: DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
@@ -63,6 +64,8 @@ class FlutterLocalNotificationService implements LocalNotificationService {
             'de la competencia.',
         importance: Importance.high,
         priority: Priority.high,
+        icon: 'ic_stat_notification',
+        color: Color(0xFFB6FF00),
       ),
       iOS: DarwinNotificationDetails(),
     );

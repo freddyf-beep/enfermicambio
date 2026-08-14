@@ -2,9 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../../shared/config/app_environment.dart';
 import '../../../shared/ui/app_logo.dart';
 import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
@@ -17,7 +15,7 @@ import '../../nutrition/presentation/calorie_plan_screen.dart';
 import '../../notifications/data/push_notification_service.dart';
 import '../../notifications/data/supabase_notification_repository.dart';
 import '../../notifications/domain/notification_models.dart';
-import '../../notifications/presentation/ntfy_bridge_setup_screen.dart';
+import '../../notifications/presentation/bark_bridge_setup_screen.dart';
 import '../../weight/presentation/weight_screen.dart';
 import '../../workouts/data/supabase_workout_repository.dart';
 import '../../workouts/domain/workout_models.dart';
@@ -548,28 +546,31 @@ class _NotificationPreferencesSectionState
             )
           : Column(
               children: [
-                const _PushNotificationStatusCard(),
+                if (defaultTargetPlatform == TargetPlatform.android)
+                  const _PushNotificationStatusCard(),
                 const Divider(height: 1),
-                ListTile(
-                  leading: const Icon(
-                    Icons.notifications_paused_outlined,
-                    color: AppColors.primaryLight,
-                  ),
-                  title: const Text(
-                    'Configurar ntfy para iPhone',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: const Text(
-                    'Puente externo: no requiere instalar una web en la pantalla de inicio.',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const NtfyBridgeSetupScreen(),
+                if (defaultTargetPlatform == TargetPlatform.iOS) ...[
+                  ListTile(
+                    leading: const Icon(
+                      Icons.notifications_active_outlined,
+                      color: AppColors.primaryLight,
+                    ),
+                    title: const Text(
+                      'Configurar Bark para iPhone',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: const Text(
+                      'Puente externo con aplicación nativa; no crea un marcador web.',
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const BarkBridgeSetupScreen(),
+                      ),
                     ),
                   ),
-                ),
-                const Divider(height: 1),
+                  const Divider(height: 1),
+                ],
                 for (final category in NotificationCategory.values)
                   SwitchListTile(
                     dense: true,
@@ -604,12 +605,6 @@ class _PushNotificationStatusCardState
 
   Future<void> _retry() async {
     await _service.refreshRegistration();
-  }
-
-  Future<void> _openWebBridge() async {
-    final uri = Uri.tryParse(AppEnvironment.webPushBridgeUrl);
-    if (uri == null) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
   }
 
   @override
@@ -661,16 +656,6 @@ class _PushNotificationStatusCardState
                       Text(
                         status.platform!,
                         style: Theme.of(context).textTheme.labelSmall,
-                      ),
-                    ],
-                    if (defaultTargetPlatform == TargetPlatform.iOS &&
-                        !status.isRegistered &&
-                        AppEnvironment.webPushBridgeUrl.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      OutlinedButton.icon(
-                        onPressed: _openWebBridge,
-                        icon: const Icon(Icons.public, size: 17),
-                        label: const Text('Activar puente web para iPhone'),
                       ),
                     ],
                   ],
