@@ -5,14 +5,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'local_notification_service.dart';
 
-/// Bridges new database notifications to OS-level notifications. When the app
-/// is in the foreground the in-app badge and list already signal the event,
-/// so nothing is shown (no duplicates); when the app is paused/inactive the
-/// local channel delivers the alert.
-///
-/// FCM-ready: the server-side rows are the single source of truth; this
-/// listener is the client delivery path. A future FCM slice replaces this
-/// listener with remote push from the Edge Functions.
+/// Fallback bridge for database notifications while the app process is alive.
+/// When the app is in the foreground the in-app badge and list already signal
+/// the event, so nothing is shown here; when the app is paused/inactive the
+/// local channel can deliver the alert. FCM/APNs is the reliable path when the
+/// app is terminated; this Realtime listener remains useful offline and when
+/// Firebase has not been configured yet.
 class NotificationDeliveryCoordinator {
   NotificationDeliveryCoordinator._({required this.service});
 

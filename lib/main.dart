@@ -10,6 +10,7 @@ import 'features/app/data/health_sync_bootstrap.dart';
 import 'features/app/presentation/app_shell.dart';
 import 'features/auth/presentation/auth_gate.dart';
 import 'features/notifications/data/notification_delivery_coordinator.dart';
+import 'features/notifications/data/push_notification_service.dart';
 import 'shared/config/app_environment.dart';
 import 'shared/ui/app_theme.dart';
 
@@ -26,6 +27,7 @@ Future<void> main() async {
         publishableKey: AppEnvironment.supabaseAnonKey,
       );
       unawaited(NotificationDeliveryCoordinator.ensure().start());
+      unawaited(PushNotificationService.ensure().start());
     } on Exception {
       // A backend failure must never blank the screen; the auth gate will
       // surface an offline/error state instead.

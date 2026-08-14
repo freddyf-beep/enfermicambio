@@ -30,6 +30,12 @@ enabled = false
 # cert_path = "../certs/my-cert.pem"
 # key_path = "../certs/my-key.pem"
 
+[functions.send_push]
+# This endpoint authenticates database-triggered calls with a private key
+# stored in public.push_dispatch_secrets, so gateway JWT validation is not
+# used for this internal webhook.
+verify_jwt = false
+
 [db]
 # Port to use for the local database URL.
 port = 54322
