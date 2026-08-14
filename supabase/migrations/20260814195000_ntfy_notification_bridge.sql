@@ -67,7 +67,10 @@ begin
   insert into public.ntfy_devices (user_id, topic, server_url, enabled, last_seen_at, updated_at)
   values (
     v_user_id,
-    'enfermicambio_' || encode(gen_random_bytes(18), 'hex'),
+    -- gen_random_bytes() belongs to pgcrypto and is not enabled on every
+    -- project. gen_random_uuid() is available in Supabase by default and
+    -- provides enough entropy for this private capability topic.
+    'enfermicambio_' || replace(gen_random_uuid()::text, '-', ''),
     'https://ntfy.sh',
     true,
     now(),
