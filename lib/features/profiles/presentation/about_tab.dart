@@ -17,6 +17,7 @@ import '../../nutrition/presentation/calorie_plan_screen.dart';
 import '../../notifications/data/push_notification_service.dart';
 import '../../notifications/data/supabase_notification_repository.dart';
 import '../../notifications/domain/notification_models.dart';
+import '../../notifications/presentation/ntfy_bridge_setup_screen.dart';
 import '../../weight/presentation/weight_screen.dart';
 import '../../workouts/data/supabase_workout_repository.dart';
 import '../../workouts/domain/workout_models.dart';
@@ -545,9 +546,29 @@ class _NotificationPreferencesSectionState
                 ),
               ),
             )
-          : Column(
+            : Column(
               children: [
                 const _PushNotificationStatusCard(),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(
+                    Icons.notifications_paused_outlined,
+                    color: AppColors.primaryLight,
+                  ),
+                  title: const Text(
+                    'Configurar ntfy para iPhone',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: const Text(
+                    'Puente externo: no requiere instalar una web en la pantalla de inicio.',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const NtfyBridgeSetupScreen(),
+                    ),
+                  ),
+                ),
                 const Divider(height: 1),
                 for (final category in NotificationCategory.values)
                   SwitchListTile(

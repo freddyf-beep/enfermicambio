@@ -83,15 +83,47 @@ Para dejarlo listo mañana se necesitarían únicamente el token de la aplicaci�
 y las claves de usuario/grupo. Nunca se deben guardar esas claves en Flutter,
 GitHub ni en el APK/IPA; deben quedar como secretos del servidor.
 
-### Opción privada: ntfy en el servidor Ubuntu
+### Opción recomendada: ntfy como puente externo
 
-ntfy permite publicar por HTTP en un tópico y puede autoalojarse en Ubuntu.
-El tópico debe tratarse como un secreto largo, porque quien lo conoce puede
-publicar mensajes. Cada iPhone/Android instala el cliente ntfy y se suscribe al
-tópico privado. Documentación oficial: <https://docs.ntfy.sh/publish/>.
+La app ya integra ntfy en la misma cola `notifications` → `push_outbox` →
+`send_push`. Supabase crea un tópico aleatorio por usuario en
+`ntfy_devices`; el tópico no se expone mediante una tabla pública y se entrega
+solo al usuario autenticado mediante `get_or_create_ntfy_subscription()`.
 
-Es la alternativa con más control, pero requiere mantener el servicio HTTPS,
-actualizaciones, respaldo y una suscripción separada en cada dispositivo.
+La configuración actual usa el servicio gratuito alojado en `https://ntfy.sh`.
+El servidor publica mediante un POST JSON y nunca guarda la credencial en la
+APK/IPA. ntfy documenta este flujo HTTP y recomienda tratar el nombre del
+tópico como una contraseña larga: <https://docs.ntfy.sh/publish/>.
+
+#### Tutorial para cada usuario
+
+1. Instalar **ntfy** desde la App Store o Google Play y permitir sus
+   notificaciones.
+2. Abrir EnfermiCambio y entrar en **NOSOTROS → Notificaciones → Configurar
+   ntfy para iPhone**.
+3. Pulsar **Abrir mi canal en ntfy**. Si iOS abre Safari, usar **Copiar
+   tópico**, abrir ntfy, pulsar `+` y pegar el tópico.
+4. Confirmar la suscripción y dejar activadas las notificaciones de ntfy en
+   Ajustes del iPhone.
+
+No hay que añadir una página a la pantalla de inicio, ni mantener abierta
+EnfermiCambio. Cada usuario repite estos cuatro pasos una sola vez en su
+propio teléfono. El aviso aparecerá con la identidad de ntfy; la campana y el
+feed de EnfermiCambio siguen siendo la fuente de verdad.
+
+La tabla ya está provisionada para los cuatro perfiles autorizados. Para
+cambiar el proveedor en el futuro, `NTFY_BASE_URL` vive como secreto de la Edge
+Function y no se guarda en Git.
+
+#### Privacidad y servidor Ubuntu
+
+El canal de ntfy es una capacidad: cualquiera que conozca el tópico puede
+suscribirse. Por eso la app no lo muestra en el feed ni lo comparte, y los
+mensajes no deben incluir información médica sensible. Si más adelante se
+autoaloja ntfy en Ubuntu, iOS necesita que ese servidor configure
+`upstream-base-url: https://ntfy.sh` para que lleguen los pushes instantáneos;
+la documentación oficial explica esta limitación:
+<https://docs.ntfy.sh/config/>.
 
 ### Opción navegador
 

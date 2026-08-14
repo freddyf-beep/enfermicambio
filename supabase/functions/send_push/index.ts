@@ -26,7 +26,12 @@ type WebPushDevice = {
   auth: string;
   provider: "web";
 };
-type PushDevice = NativePushDevice | WebPushDevice;
+type NtfyDevice = {
+  topic: string;
+  server_url: string;
+  provider: "ntfy";
+};
+type PushDevice = NativePushDevice | WebPushDevice | NtfyDevice;
 type DeliveryResult = { ok: boolean; permanent: boolean; error?: string };
 
 let fcmAccessToken: { value: string; expiresAt: number } | null = null;
@@ -297,12 +302,85 @@ async function sendWebPush(
   }
 }
 
+function ntfyBaseUrl(): string {
+  const configured = env("NTFY_BASE_URL") || "https://ntfy.sh";
+  const parsed = new URL(configured);
+  if (parsed.protocol !== "https:") {
+    throw new Error("NTFY_BASE_URL debe usar HTTPS");
+  }
+  return parsed.toString().replace(/\/$/, "");
+}
+
+function ntfyTag(type: string): string {
+  if (type.includes("workout")) return "running_shoe";
+  if (type.includes("achievement") || type.includes("round")) return "trophy";
+  if (type.includes("feed") || type.includes("social")) return "speech_balloon";
+  if (type.includes("mission")) return "dart";
+  return "loudspeaker";
+}
+
+async function sendNtfy(
+  device: NtfyDevice,
+  notification: NotificationRow,
+): Promise<DeliveryResult> {
+  if (!/^[A-Za-z0-9_-]{24,64}$/.test(device.topic)) {
+    return { ok: false, permanent: true, error: "Tópico ntfy inválido" };
+  }
+
+  let baseUrl: string;
+  try {
+    // The database currently fixes this to ntfy.sh. Keeping the URL validation
+    // here prevents a future row change from turning the dispatcher into an
+    // arbitrary server-side request proxy.
+    baseUrl = ntfyBaseUrl();
+    const rowUrl = new URL(device.server_url);
+    if (rowUrl.protocol !== "https:" || rowUrl.hostname !== new URL(baseUrl).hostname) {
+      return { ok: false, permanent: false, error: "Servidor ntfy no autorizado" };
+    }
+  } catch (error) {
+    return {
+      ok: false,
+      permanent: false,
+      error: `Configuración ntfy inválida: ${String(error).slice(0, 300)}`,
+    };
+  }
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  const publishToken = env("NTFY_PUBLISH_TOKEN");
+  if (publishToken) headers.Authorization = `Bearer ${publishToken}`;
+
+  const response = await fetch(`${baseUrl}/`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      topic: device.topic,
+      title: notification.title,
+      message: notification.body,
+      priority: 4,
+      tags: [ntfyTag(notification.type)],
+    }),
+  });
+  if (response.ok) return { ok: true, permanent: false };
+  const errorBody = await response.text();
+  const permanent = response.status === 401 || response.status === 403 || response.status === 404;
+  return {
+    ok: false,
+    permanent,
+    error: `ntfy ${response.status}: ${errorBody.slice(0, 500)}`,
+  };
+}
+
 async function sendToDevice(
   device: PushDevice,
   notification: NotificationRow,
 ): Promise<DeliveryResult> {
   if (device.provider === "web") {
     return sendWebPush(device, notification);
+  }
+  if (device.provider === "ntfy") {
+    return sendNtfy(device, notification);
   }
   return device.provider === "apns"
     ? sendApns(device, notification)
@@ -328,7 +406,7 @@ async function processOutbox(
     return { success: true, sent: 0, disabled: 0 };
   }
 
-  const [nativeResult, webResult] = await Promise.all([
+  const [nativeResult, webResult, ntfyResult] = await Promise.all([
     supabaseAdmin
       .from("push_devices")
       .select("token, platform, provider, app_id")
@@ -339,15 +417,25 @@ async function processOutbox(
       .select("endpoint, p256dh, auth")
       .eq("user_id", outbox.user_id)
       .eq("enabled", true),
+    supabaseAdmin
+      .from("ntfy_devices")
+      .select("topic, server_url")
+      .eq("user_id", outbox.user_id)
+      .eq("enabled", true),
   ]);
   if (nativeResult.error) throw new Error(nativeResult.error.message);
   if (webResult.error) throw new Error(webResult.error.message);
+  if (ntfyResult.error) throw new Error(ntfyResult.error.message);
 
   const devices: PushDevice[] = [
     ...((nativeResult.data ?? []) as NativePushDevice[]),
     ...((webResult.data ?? []) as WebPushDevice[]).map((device) => ({
       ...device,
       provider: "web" as const,
+    })),
+    ...((ntfyResult.data ?? []) as Array<Omit<NtfyDevice, "provider">>).map((device) => ({
+      ...device,
+      provider: "ntfy" as const,
     })),
   ];
 
@@ -379,6 +467,12 @@ async function processOutbox(
               .update({ enabled: false })
               .eq("user_id", outbox.user_id)
               .eq("endpoint", device.endpoint);
+          } else if (device.provider === "ntfy") {
+            await supabaseAdmin
+              .from("ntfy_devices")
+              .update({ enabled: false, updated_at: new Date().toISOString() })
+              .eq("user_id", outbox.user_id)
+              .eq("topic", device.topic);
           } else {
             await supabaseAdmin
               .from("push_devices")

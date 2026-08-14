@@ -47,11 +47,11 @@ class AppEnvironment {
   );
   static const String _appVersionDefine = String.fromEnvironment(
     'APP_VERSION',
-    defaultValue: '1.2.4',
+    defaultValue: '1.2.5',
   );
   static const int _appBuildDefine = int.fromEnvironment(
     'APP_BUILD',
-    defaultValue: 11,
+    defaultValue: 12,
   );
   static const String _releaseManifestUrlDefine = String.fromEnvironment(
     'RELEASE_MANIFEST_URL',
