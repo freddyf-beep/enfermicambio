@@ -15,7 +15,10 @@ class SupabaseWorkoutRouteRepository {
   }) async {
     final rows = await _client
         .from('workout_route_points')
-        .select('timestamp, latitude, longitude, altitude, accuracy, bearing')
+        .select(
+          'timestamp, latitude, longitude, altitude, accuracy, bearing, '
+          'segment_index',
+        )
         .eq('workout_id', workoutId)
         .order('timestamp', ascending: true)
         .limit(limit);
@@ -29,6 +32,7 @@ class SupabaseWorkoutRouteRepository {
             altitude: (row['altitude'] as num?)?.toDouble(),
             accuracy: (row['accuracy'] as num?)?.toDouble(),
             bearing: (row['bearing'] as num?)?.toDouble(),
+            segmentIndex: (row['segment_index'] as num?)?.toInt() ?? 0,
           );
         })
         .toList(growable: false);
@@ -56,6 +60,7 @@ class SupabaseWorkoutRouteRepository {
             'altitude': point.altitude,
             'accuracy': point.accuracy,
             'bearing': point.bearing,
+            'segment_index': point.segmentIndex,
           },
       ]);
     }

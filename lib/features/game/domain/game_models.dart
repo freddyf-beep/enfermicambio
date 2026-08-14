@@ -152,6 +152,8 @@ class Streak {
     required this.streakType,
     required this.currentCount,
     required this.longestCount,
+    this.userId,
+    this.displayName,
     this.lastQualifiedDate,
   });
 
@@ -159,6 +161,10 @@ class Streak {
     streakType: (json['streak_type'] as String?) ?? '',
     currentCount: ((json['current_count'] as num?) ?? 0).toInt(),
     longestCount: ((json['longest_count'] as num?) ?? 0).toInt(),
+    userId: json['user_id'] as String?,
+    displayName:
+        (json['display_name'] as String?) ??
+        (json['profiles'] as Map<String, dynamic>?)?['display_name'] as String?,
     lastQualifiedDate: json['last_qualified_date'] == null
         ? null
         : DateTime.parse(json['last_qualified_date'] as String),
@@ -167,6 +173,8 @@ class Streak {
   final String streakType;
   final int currentCount;
   final int longestCount;
+  final String? userId;
+  final String? displayName;
   final DateTime? lastQualifiedDate;
 }
 

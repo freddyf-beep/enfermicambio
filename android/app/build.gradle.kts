@@ -24,6 +24,10 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        val mapsKey = (project.findProperty("googleMapsApiKey") as String?)
+            ?: System.getenv("GOOGLE_MAPS_API_KEY")
+            ?: ""
+        manifestPlaceholders["googleMapsApiKey"] = mapsKey
     }
 
     buildTypes {

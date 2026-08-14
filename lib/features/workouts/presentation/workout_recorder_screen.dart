@@ -324,11 +324,7 @@ class _WorkoutRecorderScreenState extends State<WorkoutRecorderScreen> {
             calories: _route.estimatedCalories().round(),
           ),
           const SizedBox(height: 16),
-          RouteMapView(
-            key: ValueKey('live-route-${points.length ~/ 5}'),
-            points: points,
-            height: 300,
-          ),
+          RouteMapView(points: points, height: 300),
           const SizedBox(height: 12),
           if (_statusMessage != null)
             Text(

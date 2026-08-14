@@ -64,3 +64,55 @@ puente como Pushover o ntfy, instalado aparte en cada iPhone.
 
 La notificación seguirá apareciendo en la campana aunque el proveedor push esté
 sin configurar; el push del sistema requiere los pasos anteriores.
+
+## Alternativas si el iPhone sigue usando firma gratuita
+
+Estas alternativas son puentes externos: no crean otra versión de
+EnfermiCambio ni sustituyen la campana interna. Cada usuario tendría que
+instalar la aplicación puente y aceptar sus propias notificaciones.
+
+### Opción recomendada: Pushover
+
+Pushover recibe un `POST` en `https://api.pushover.net/1/messages.json` con un
+token de aplicación, una clave de usuario o grupo y el mensaje. Es sencilla y
+fiable para cuatro usuarios, pero el aviso llega con la identidad de Pushover,
+no con la de EnfermiCambio. La referencia oficial es
+<https://pushover.net/api>.
+
+Para dejarlo listo mañana se necesitarían únicamente el token de la aplicación
+y las claves de usuario/grupo. Nunca se deben guardar esas claves en Flutter,
+GitHub ni en el APK/IPA; deben quedar como secretos del servidor.
+
+### Opción privada: ntfy en el servidor Ubuntu
+
+ntfy permite publicar por HTTP en un tópico y puede autoalojarse en Ubuntu.
+El tópico debe tratarse como un secreto largo, porque quien lo conoce puede
+publicar mensajes. Cada iPhone/Android instala el cliente ntfy y se suscribe al
+tópico privado. Documentación oficial: <https://docs.ntfy.sh/publish/>.
+
+Es la alternativa con más control, pero requiere mantener el servicio HTTPS,
+actualizaciones, respaldo y una suscripción separada en cada dispositivo.
+
+### Opción navegador
+
+Una PWA con Web Push puede servir como respaldo para Chrome y algunos flujos de
+Safari, siempre con HTTPS y una suscripción por dispositivo. No es equivalente
+a APNs para una IPA instalada: iOS puede limitar la entrega en segundo plano.
+Por eso la dejaría como respaldo web, no como solución principal.
+
+## Datos mínimos para la activación final
+
+Si se habilita FCM/APNs directo, Freddy debe entregar mañana los valores de
+Firebase del proyecto y configurar en Supabase el secreto
+`FCM_SERVICE_ACCOUNT_JSON` (o sus tres variables equivalentes). Para APNs
+directo también hacen falta `APNS_KEY_ID`, `APNS_TEAM_ID`, `APNS_PRIVATE_KEY` y
+`APNS_BUNDLE_ID`, además de una firma Apple con Push Notifications.
+
+Si se escoge un puente externo, solo se pide la credencial de ese proveedor:
+
+- Pushover: token de aplicación y claves de usuario/grupo.
+- ntfy: URL HTTPS del servidor y tópico/credencial privada.
+
+La aplicación debe seguir funcionando aunque esos secretos falten: se mantiene
+la campana interna, Realtime y las notificaciones locales mientras el proceso
+está abierto.

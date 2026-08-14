@@ -39,10 +39,8 @@ dependencies:
   timezone: ^0.10.1
   intl: ^0.20.3
   flutter_dotenv: ^5.2.1
-  flutter_map: ^7.0.2
   google_sign_in: ^6.2.2
   http: ^1.2.2
-  latlong2: ^0.9.1
   mobile_scanner: ^5.2.3
   image_picker: ^1.1.2
   permission_handler: ^11.3.1
@@ -53,6 +51,8 @@ dependencies:
   geolocator: ^14.0.2
   firebase_core: ^4.13.0
   firebase_messaging: ^16.5.0
+  google_maps_flutter: 2.18.0
+  apple_maps_flutter: 1.4.0
  
 dev_dependencies:
   flutter_test:

@@ -59,6 +59,7 @@ class RoutePoint {
     this.altitude,
     this.accuracy,
     this.bearing,
+    this.segmentIndex = 0,
   });
 
   final DateTime timestamp;
@@ -67,4 +68,8 @@ class RoutePoint {
   final double? altitude;
   final double? accuracy;
   final double? bearing;
+
+  /// Consecutive GPS segments are kept separate when a signal gap is too
+  /// large to draw a trustworthy line between two samples.
+  final int segmentIndex;
 }

@@ -99,6 +99,12 @@ class _HomeTabState extends State<HomeTab> {
         schema: 'public',
         table: 'reactions',
         callback: refresh,
+      )
+      ..onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'post_media',
+        callback: refresh,
       );
     _realtimeChannel = channel.subscribe();
   }

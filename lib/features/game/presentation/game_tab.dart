@@ -102,15 +102,24 @@ class _GameTabState extends State<GameTab> {
       }
 
       final today = DateTime.parse(AppEnvironment.todayInCompetitionTz());
+      final userAchievementsFuture = me == null
+          ? Future.value(const <UserAchievement>[])
+          : _repository.userAchievements(me);
+      final streaksFuture = me == null
+          ? Future.value(const <Streak>[])
+          : _repository.streaksForAll();
+      final battlePassClaimsFuture = me == null
+          ? Future.value(const <BattlePassClaim>[])
+          : _repository.battlePassClaims(me, season.id);
       final results = await Future.wait<Object>([
         _repository.standingsFor(season),
         _repository.dailyMissionsFor(today),
         _repository.missionProgressFor(today),
         _repository.achievements(),
-        if (me != null) _repository.userAchievements(me),
-        if (me != null) _repository.streaksFor(me),
+        userAchievementsFuture,
+        streaksFuture,
         _repository.battlePassTiers(),
-        if (me != null) _repository.battlePassClaims(me, season.id),
+        battlePassClaimsFuture,
         _repository.seasonKm(season),
         _repository.seasonHistory(),
       ]);
@@ -369,12 +378,11 @@ class _GameTabState extends State<GameTab> {
             if (snapshot.streaks.isEmpty)
               const AsyncStateView(
                 status: AsyncViewStatus.empty(
-                  'Tu racha empieza cuando cumplas tu meta de pasos un día.',
+                  'Las rachas aparecen cuando se cierra un día con pasos, entrenamiento o meta calórica cumplida.',
                 ),
               )
             else
-              for (final streak in snapshot.streaks)
-                _StreakCard(streak: streak),
+              _StreakBoard(streaks: snapshot.streaks),
             const SizedBox(height: 24),
 
             const _SectionHeader(title: 'Logros', icon: Icons.military_tech),
@@ -926,28 +934,119 @@ class _MissionCard extends StatelessWidget {
   }
 }
 
-class _StreakCard extends StatelessWidget {
-  const _StreakCard({required this.streak});
+class _StreakBoard extends StatelessWidget {
+  const _StreakBoard({required this.streaks});
 
+  final List<Streak> streaks;
+
+  @override
+  Widget build(BuildContext context) {
+    final grouped = <String, List<Streak>>{};
+    for (final streak in streaks) {
+      grouped.putIfAbsent(streak.streakType, () => []).add(streak);
+    }
+    final types = grouped.keys.toList()..sort();
+    return Column(
+      children: [
+        for (final type in types) ...[
+          _StreakTypeCard(type: type, streaks: grouped[type]!),
+          const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+}
+
+class _StreakTypeCard extends StatelessWidget {
+  const _StreakTypeCard({required this.type, required this.streaks});
+
+  final String type;
+  final List<Streak> streaks;
+
+  String _label() => switch (type) {
+    'step_goal' => 'Meta diaria de pasos',
+    'workout' => 'Días con entrenamiento',
+    'calorie_target' => 'Días dentro de la meta calórica',
+    _ => type.replaceAll('_', ' '),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final ordered = [...streaks]
+      ..sort((a, b) => b.currentCount.compareTo(a.currentCount));
+    return Card(
+      margin: EdgeInsets.zero,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(
+                  Icons.local_fire_department,
+                  color: AppColors.streakOrange,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _label(),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            for (var index = 0; index < ordered.length; index++)
+              _StreakRow(rank: index + 1, streak: ordered[index]),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StreakRow extends StatelessWidget {
+  const _StreakRow({required this.rank, required this.streak});
+
+  final int rank;
   final Streak streak;
 
   @override
   Widget build(BuildContext context) {
-    final label = switch (streak.streakType) {
-      'step_goal' => 'Meta de pasos',
-      _ => streak.streakType,
-    };
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: const Icon(
-          Icons.local_fire_department,
-          color: AppColors.streakOrange,
-        ),
-        title: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(
-          '${streak.currentCount} días seguidos · Récord: ${streak.longestCount} días',
-        ),
+    final name = streak.displayName?.trim().isNotEmpty == true
+        ? streak.displayName!
+        : 'Usuario';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 24,
+            child: Text(
+              '#$rank',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: rank == 1
+                    ? AppColors.primaryLight
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(child: Text(name)),
+          Text(
+            '${streak.currentCount} días seguidos',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'récord ${streak.longestCount}',
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }

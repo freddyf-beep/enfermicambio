@@ -53,10 +53,19 @@ class LocationSample {
 class WorkoutRouteAccumulator {
   WorkoutRouteAccumulator({required this.activityType});
 
+  static const _emaAlpha = 0.45;
+  static const _maximumSignalGap = Duration(seconds: 30);
+
   final WorkoutActivityType activityType;
   final List<RoutePoint> _points = [];
   double _distanceMeters = 0;
   double _latestSpeed = 0;
+  DateTime? _lastValidTimestamp;
+  double? _lastRawLatitude;
+  double? _lastRawLongitude;
+  double? _smoothedLatitude;
+  double? _smoothedLongitude;
+  int _segmentIndex = 0;
 
   List<RoutePoint> get points => List.unmodifiable(_points);
   double get distanceMeters => _distanceMeters;
@@ -73,14 +82,56 @@ class WorkoutRouteAccumulator {
       return false;
     }
 
+    var outputLatitude = sample.latitude;
+    var outputLongitude = sample.longitude;
+
     if (_points.isNotEmpty) {
-      final previous = _points.last;
-      final elapsed = sample.timestamp.difference(previous.timestamp);
+      final previousTimestamp = _lastValidTimestamp;
+      final previousRawLatitude = _lastRawLatitude;
+      final previousRawLongitude = _lastRawLongitude;
+      final previousSmoothedLatitude = _smoothedLatitude;
+      final previousSmoothedLongitude = _smoothedLongitude;
+      if (previousTimestamp == null ||
+          previousRawLatitude == null ||
+          previousRawLongitude == null ||
+          previousSmoothedLatitude == null ||
+          previousSmoothedLongitude == null) {
+        return false;
+      }
+
+      final elapsed = sample.timestamp.difference(previousTimestamp);
       if (elapsed.inMilliseconds <= 0) return false;
 
+      if (elapsed > _maximumSignalGap) {
+        // Start a new segment after a pause/lost signal. Keeping the segment
+        // marker prevents the map from drawing a fabricated straight line
+        // across the missing GPS interval.
+        _segmentIndex++;
+        _smoothedLatitude = sample.latitude;
+        _smoothedLongitude = sample.longitude;
+        _lastRawLatitude = sample.latitude;
+        _lastRawLongitude = sample.longitude;
+        _lastValidTimestamp = sample.timestamp;
+        _latestSpeed = 0;
+        _points.add(
+          RoutePoint(
+            timestamp: sample.timestamp,
+            latitude: outputLatitude,
+            longitude: outputLongitude,
+            altitude: sample.altitude.isFinite ? sample.altitude : null,
+            accuracy: sample.accuracy,
+            bearing: sample.bearing.isFinite && sample.bearing >= 0
+                ? sample.bearing
+                : null,
+            segmentIndex: _segmentIndex,
+          ),
+        );
+        return true;
+      }
+
       final segment = haversineDistanceMeters(
-        previous.latitude,
-        previous.longitude,
+        previousRawLatitude,
+        previousRawLongitude,
         sample.latitude,
         sample.longitude,
       );
@@ -91,29 +142,60 @@ class WorkoutRouteAccumulator {
         return false;
       }
 
-      // Ignore sub-meter GPS jitter while the user is standing still.
-      if (segment < 1.5) {
+      final nextSmoothedLatitude = _points.length == 1
+          ? sample.latitude
+          : previousSmoothedLatitude +
+                _emaAlpha * (sample.latitude - previousSmoothedLatitude);
+      final nextSmoothedLongitude = _points.length == 1
+          ? sample.longitude
+          : previousSmoothedLongitude +
+                _emaAlpha * (sample.longitude - previousSmoothedLongitude);
+      final smoothedSegment = haversineDistanceMeters(
+        previousSmoothedLatitude,
+        previousSmoothedLongitude,
+        nextSmoothedLatitude,
+        nextSmoothedLongitude,
+      );
+
+      // Advance the filter even when this sample is only GPS jitter. This
+      // lets the EMA settle without adding false distance to the route.
+      _smoothedLatitude = nextSmoothedLatitude;
+      _smoothedLongitude = nextSmoothedLongitude;
+      outputLatitude = nextSmoothedLatitude;
+      outputLongitude = nextSmoothedLongitude;
+      _lastRawLatitude = sample.latitude;
+      _lastRawLongitude = sample.longitude;
+      _lastValidTimestamp = sample.timestamp;
+      if (smoothedSegment < 1.5) {
         _latestSpeed = sample.speed.isFinite && sample.speed > 0
             ? sample.speed
             : 0;
         return false;
       }
-      _distanceMeters += segment;
+
+      _distanceMeters += smoothedSegment;
       _latestSpeed = sample.speed.isFinite && sample.speed >= 0
           ? sample.speed
-          : calculatedSpeed;
+          : smoothedSegment / seconds;
+    } else {
+      _smoothedLatitude = sample.latitude;
+      _smoothedLongitude = sample.longitude;
+      _lastRawLatitude = sample.latitude;
+      _lastRawLongitude = sample.longitude;
+      _lastValidTimestamp = sample.timestamp;
     }
 
     _points.add(
       RoutePoint(
         timestamp: sample.timestamp,
-        latitude: sample.latitude,
-        longitude: sample.longitude,
+        latitude: outputLatitude,
+        longitude: outputLongitude,
         altitude: sample.altitude.isFinite ? sample.altitude : null,
         accuracy: sample.accuracy,
         bearing: sample.bearing.isFinite && sample.bearing >= 0
             ? sample.bearing
             : null,
+        segmentIndex: _segmentIndex,
       ),
     );
     return true;

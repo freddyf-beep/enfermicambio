@@ -39,6 +39,75 @@ async function deterministicUuid(name: string): Promise<string> {
     `${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+async function updateStreak(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  userId: string,
+  streakType: string,
+  competitionDate: string,
+  qualified: boolean,
+): Promise<void> {
+  const { data: streak, error: readError } = await supabaseAdmin
+    .from("streaks")
+    .select("current_count, longest_count, last_qualified_date")
+    .eq("user_id", userId)
+    .eq("streak_type", streakType)
+    .maybeSingle();
+  if (readError) throw new Error(`streak read failed: ${readError.message}`);
+
+  const current = Number(streak?.current_count ?? 0);
+  const longest = Number(streak?.longest_count ?? 0);
+  const lastDate = streak?.last_qualified_date
+    ? String(streak.last_qualified_date)
+    : null;
+
+  // A retry for the same competition day must not increment or erase a
+  // streak. The ingestion can be retried after the scheduler already ran.
+  if (lastDate === competitionDate) return;
+
+  let nextCount = 0;
+  let nextLastDate = lastDate;
+  if (qualified) {
+    const day = new Date(`${competitionDate}T00:00:00Z`);
+    const previous = lastDate ? new Date(`${lastDate}T00:00:00Z`) : null;
+    const isConsecutive = previous != null &&
+      (day.getTime() - previous.getTime()) === 86400000;
+    nextCount = isConsecutive ? current + 1 : 1;
+    nextLastDate = competitionDate;
+  }
+
+  const { error: upsertError } = await supabaseAdmin.from("streaks").upsert({
+    user_id: userId,
+    streak_type: streakType,
+    current_count: nextCount,
+    longest_count: Math.max(longest, nextCount),
+    last_qualified_date: nextLastDate,
+  }, { onConflict: "user_id,streak_type" });
+  if (upsertError) throw new Error(`streak update failed: ${upsertError.message}`);
+}
+
+async function awardOnce(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  seasonId: string,
+  userId: string,
+  points: number,
+  reason: string,
+  referenceKey: string,
+): Promise<void> {
+  if (points <= 0) return;
+  const referenceId = await deterministicUuid(referenceKey);
+  const { error } = await supabaseAdmin.rpc("award_points", {
+    p_season_id: seasonId,
+    p_user_id: userId,
+    p_points: points,
+    p_reason: reason,
+    p_reference_type: "daily_result",
+    p_reference_id: referenceId,
+  });
+  if (error && !error.message.includes("duplicate")) {
+    throw new Error(`${reason} award failed: ${error.message}`);
+  }
+}
+
 export default {
   fetch: withSupabase(
     { auth: ["publishable", "secret"] },
@@ -115,54 +184,85 @@ async function handle(
 
   // Step-goal streaks: award the step goal bonus and update streaks.
   const streakPoints = (config.get("step_goal_points") as number) ?? 2;
-  const { data: profiles } = await supabaseAdmin
+  const { data: profiles, error: profilesError } = await supabaseAdmin
     .from("profiles")
-    .select("id, daily_step_target");
+    .select("id, daily_step_target, daily_calorie_target");
+  if (profilesError) throw new Error(`profiles read failed: ${profilesError.message}`);
 
-  for (const row of rows) {
-    const profile = (profiles ?? []).find((p) => p.id === row.user_id);
-    const target = profile?.daily_step_target ?? stepGoalDefault;
-    if (row.daily_steps < target) continue;
+  const dayStart = `${competitionDate}T00:00:00Z`;
+  const nextDate = new Date(`${competitionDate}T00:00:00Z`);
+  nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+  const dayEnd = nextDate.toISOString();
+  const [{ data: dayWorkouts, error: workoutsError }, { data: dayFoods, error: foodsError }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("workouts")
+        .select("user_id, started_at")
+        .gte("started_at", dayStart)
+        .lt("started_at", dayEnd),
+      supabaseAdmin
+        .from("food_entries")
+        .select("user_id, calories, logged_at")
+        .gte("logged_at", dayStart)
+        .lt("logged_at", dayEnd),
+    ]);
+  if (workoutsError) throw new Error(`workouts read failed: ${workoutsError.message}`);
+  if (foodsError) throw new Error(`food entries read failed: ${foodsError.message}`);
 
-    const refId = await deterministicUuid(`step_goal:${competitionDate}:${row.user_id}`);
-    const { error: goalErr } = await supabaseAdmin.rpc("award_points", {
-      p_season_id: season.id,
-      p_user_id: row.user_id,
-      p_points: streakPoints,
-      p_reason: "step_goal",
-      p_reference_type: "daily_result",
-      p_reference_id: refId,
-    });
-    if (goalErr && !goalErr.message.includes("duplicate")) {
-      throw new Error(`step goal award failed: ${goalErr.message}`);
+  const workoutUsers = new Set((dayWorkouts ?? []).map((row) => String(row.user_id)));
+  const foodTotals = new Map<string, number>();
+  for (const row of dayFoods ?? []) {
+    const calories = Number(row.calories ?? 0);
+    foodTotals.set(String(row.user_id), (foodTotals.get(String(row.user_id)) ?? 0) + calories);
+  }
+
+  const workoutStreakPoints = Number(config.get("workout_streak_points") ?? 3);
+  const calorieStreakPoints = Number(config.get("calorie_target_points") ?? 2);
+  const activityByUser = new Map(rows.map((row) => [String(row.user_id), row]));
+  for (const profile of profiles ?? []) {
+    const userId = String(profile.id);
+    const activityRow = activityByUser.get(userId);
+    const stepTarget = Number(profile.daily_step_target ?? stepGoalDefault);
+    const stepQualified = activityRow != null && Number(activityRow.daily_steps ?? 0) >= stepTarget;
+    await updateStreak(supabaseAdmin, userId, "step_goal", competitionDate, stepQualified);
+    if (stepQualified) {
+      await awardOnce(
+        supabaseAdmin,
+        season.id,
+        userId,
+        streakPoints,
+        "step_goal",
+        `step_goal:${competitionDate}:${userId}`,
+      );
     }
 
-    // Update the step_goal streak row.
-    const { data: streak } = await supabaseAdmin
-      .from("streaks")
-      .select("id, current_count, longest_count, last_qualified_date")
-      .eq("user_id", row.user_id)
-      .eq("streak_type", "step_goal")
-      .maybeSingle();
-    const current = streak?.current_count ?? 0;
-    const longest = streak?.longest_count ?? 0;
-    const lastDate = streak?.last_qualified_date
-      ? new Date(streak.last_qualified_date)
-      : null;
-    const day = new Date(`${competitionDate}T00:00:00Z`);
-    const isConsecutive = lastDate
-      ? (day.getTime() - lastDate.getTime()) / 86400000 === 1
-      : false;
-    const nextCount = isConsecutive ? current + 1 : 1;
-    const nextLongest = Math.max(longest, nextCount);
+    const workoutQualified = workoutUsers.has(userId);
+    await updateStreak(supabaseAdmin, userId, "workout", competitionDate, workoutQualified);
+    if (workoutQualified) {
+      await awardOnce(
+        supabaseAdmin,
+        season.id,
+        userId,
+        workoutStreakPoints,
+        "workout",
+        `workout:${competitionDate}:${userId}`,
+      );
+    }
 
-    await supabaseAdmin.from("streaks").upsert({
-      user_id: row.user_id,
-      streak_type: "step_goal",
-      current_count: nextCount,
-      longest_count: nextLongest,
-      last_qualified_date: competitionDate,
-    }, { onConflict: "user_id,streak_type" });
+    const consumed = foodTotals.get(userId) ?? 0;
+    const calorieTarget = Number(profile.daily_calorie_target ?? 0);
+    const calorieQualified = calorieTarget > 0 && consumed > 0 && consumed <= calorieTarget;
+    await updateStreak(supabaseAdmin, userId, "calorie_target", competitionDate, calorieQualified);
+    if (calorieQualified) {
+      await awardOnce(
+        supabaseAdmin,
+        season.id,
+        userId,
+        calorieStreakPoints,
+        "calorie_target",
+        `calorie_target:${competitionDate}:${userId}`,
+      );
+    }
   }
 
   // Evaluate the day's rotating missions and lifetime achievements.

@@ -108,6 +108,29 @@ class SupabaseGameRepository {
         .toList(growable: false);
   }
 
+  /// Returns the four users' streaks so the game tab can compare the same
+  /// rule for everyone, instead of silently showing only the signed-in user.
+  Future<List<Streak>> streaksForAll() async {
+    final rows = await _client
+        .from('streaks')
+        .select(
+          'user_id, streak_type, current_count, longest_count, '
+          'last_qualified_date, profiles(display_name)',
+        )
+        .order('streak_type')
+        .order('current_count', ascending: false);
+    return rows
+        .cast<Map<String, dynamic>>()
+        .map((row) {
+          final profile = _relationObject(row['profiles']);
+          return Streak.fromJson({
+            ...row,
+            'display_name': profile['display_name'],
+          });
+        })
+        .toList(growable: false);
+  }
+
   Future<List<BattlePassTier>> battlePassTiers() async {
     final rows = await _client
         .from('battle_pass_tiers')
