@@ -156,15 +156,20 @@ class _PostCard extends StatelessWidget {
                   backgroundColor: AppColors.primaryLight.withValues(
                     alpha: 0.2,
                   ),
-                  child: Text(
-                    post.authorName.isEmpty
-                        ? '?'
-                        : post.authorName[0].toUpperCase(),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primaryLight,
-                    ),
-                  ),
+                  backgroundImage: post.authorAvatarUrl == null
+                      ? null
+                      : NetworkImage(post.authorAvatarUrl!),
+                  child: post.authorAvatarUrl == null
+                      ? Text(
+                          post.authorName.isEmpty
+                              ? '?'
+                              : post.authorName[0].toUpperCase(),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryLight,
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 10),
                 Expanded(

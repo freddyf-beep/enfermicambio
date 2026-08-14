@@ -68,6 +68,7 @@ jobs:
           FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
           RELEASE_MANIFEST_URL: ${{ vars.RELEASE_MANIFEST_URL || 'https://invisible-tiffany-improvements-compound.trycloudflare.com/enfermicambio/releases/latest.json' }}
+          WEB_PUSH_BRIDGE_URL: ${{ vars.WEB_PUSH_BRIDGE_URL || 'https://invisible-tiffany-improvements-compound.trycloudflare.com/enfermicambio/push/' }}
         run: |
           APP_VERSION="$(sed -n 's/^version: \([^+]*\)+.*$/\1/p' pubspec.yaml)"
           APP_BUILD="$(sed -n 's/^version: .*+\([0-9]*\)$/\1/p' pubspec.yaml)"
@@ -83,6 +84,7 @@ jobs:
             --dart-define=APP_VERSION="$APP_VERSION" \
             --dart-define=APP_BUILD="$APP_BUILD" \
             --dart-define=RELEASE_MANIFEST_URL="$RELEASE_MANIFEST_URL" \
+            --dart-define=WEB_PUSH_BRIDGE_URL="$WEB_PUSH_BRIDGE_URL" \
             -PgoogleMapsApiKey="$GOOGLE_MAPS_API_KEY"
 
       - name: Upload APK artifact
@@ -127,6 +129,7 @@ jobs:
           FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           FIREBASE_IOS_BUNDLE_ID: ${{ secrets.FIREBASE_IOS_BUNDLE_ID || 'com.enfermicambio.enfermicambio' }}
           RELEASE_MANIFEST_URL: ${{ vars.RELEASE_MANIFEST_URL || 'https://invisible-tiffany-improvements-compound.trycloudflare.com/enfermicambio/releases/latest.json' }}
+          WEB_PUSH_BRIDGE_URL: ${{ vars.WEB_PUSH_BRIDGE_URL || 'https://invisible-tiffany-improvements-compound.trycloudflare.com/enfermicambio/push/' }}
         run: |
           APP_VERSION="$(sed -n 's/^version: \([^+]*\)+.*$/\1/p' pubspec.yaml)"
           APP_BUILD="$(sed -n 's/^version: .*+\([0-9]*\)$/\1/p' pubspec.yaml)"
@@ -142,18 +145,21 @@ jobs:
             --dart-define=FIREBASE_IOS_BUNDLE_ID="$FIREBASE_IOS_BUNDLE_ID" \
             --dart-define=APP_VERSION="$APP_VERSION" \
             --dart-define=APP_BUILD="$APP_BUILD" \
-            --dart-define=RELEASE_MANIFEST_URL="$RELEASE_MANIFEST_URL"
+            --dart-define=RELEASE_MANIFEST_URL="$RELEASE_MANIFEST_URL" \
+            --dart-define=WEB_PUSH_BRIDGE_URL="$WEB_PUSH_BRIDGE_URL"
 
       - name: Package unsigned IPA for sideloading
         run: |
+          APP_VERSION="$(sed -n 's/^version: \([^+]*\)+.*$/\1/p' pubspec.yaml)"
+          APP_BUILD="$(sed -n 's/^version: .*+\([0-9]*\)$/\1/p' pubspec.yaml)"
           rm -rf build/ipa
           mkdir -p build/ipa/Payload
           cp -R build/ios/iphoneos/Runner.app build/ipa/Payload/Runner.app
           ditto -c -k --sequesterRsrc --keepParent build/ipa/Payload \
-            "build/EnfermiCambio-${GITHUB_RUN_NUMBER}-unsigned.ipa"
+            "build/EnfermiCambio-${APP_VERSION}-build${APP_BUILD}-unsigned.ipa"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: enfermicambio-ipa-${{ github.run_number }}
-          path: build/EnfermiCambio-${{ github.run_number }}-unsigned.ipa
+          path: build/EnfermiCambio-*-unsigned.ipa

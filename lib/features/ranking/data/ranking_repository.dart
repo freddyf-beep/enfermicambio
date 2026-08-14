@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../../shared/config/app_environment.dart';
+import '../../../shared/storage/supabase_storage_reference.dart';
 import '../domain/ranking_models.dart';
 
 /// Carga rankings reales por categoría y período desde Supabase.
@@ -10,6 +11,9 @@ class RankingRepository {
   RankingRepository({required this._client});
 
   final SupabaseClient _client;
+
+  SupabaseStorageReferenceResolver get _storage =>
+      SupabaseStorageReferenceResolver(client: _client);
 
   Future<List<RankingRow>> load({
     required RankingCategory category,
@@ -20,7 +24,15 @@ class RankingRepository {
     final profiles = await _client
         .from('profiles')
         .select('id, display_name, avatar_url');
-    final users = profiles.cast<Map<String, dynamic>>().toList();
+    final users = await Future.wait(
+      profiles.cast<Map<String, dynamic>>().map((profile) async {
+        final copy = Map<String, dynamic>.from(profile);
+        copy['avatar_url'] = await _storage.resolve(
+          profile['avatar_url'] as String?,
+        );
+        return copy;
+      }),
+    );
 
     final (start, end) = await _rangeFor(period, now);
     final competitionLocation = tz.getLocation(

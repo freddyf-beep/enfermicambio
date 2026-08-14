@@ -116,3 +116,28 @@ Si se escoge un puente externo, solo se pide la credencial de ese proveedor:
 La aplicación debe seguir funcionando aunque esos secretos falten: se mantiene
 la campana interna, Realtime y las notificaciones locales mientras el proceso
 está abierto.
+## Puente Web Push para iPhone
+
+Cuando una IPA está instalada con una firma gratuita o con un perfil que no
+incluye APNs, iOS puede no entregar el token nativo. La app mantiene el
+registro nativo para Android/iOS firmados y, además, ofrece el puente web
+privado en `web_push/`.
+
+El puente se publica desde el servidor Ubuntu en:
+
+`/enfermicambio/push/`
+
+Cada usuario debe abrirlo en Safari, añadirlo a la pantalla de inicio, abrir
+el icono instalado, iniciar sesión y pulsar **Activar avisos**. La suscripción
+se guarda en `web_push_devices` con RLS por usuario. Las notificaciones pasan
+por la misma cola `notifications` → `push_outbox` y `send_push`; el servidor
+elige FCM/APNs o Web Push según los dispositivos activos.
+
+La clave privada VAPID vive únicamente como secreto de Supabase Edge Functions.
+El archivo `web_push/config.js` solo contiene la URL pública de Supabase, la
+clave publicable y la clave pública VAPID, y está excluido de Git.
+
+En iPhone la autorización de Web Push requiere una interacción visible y una
+web app añadida a la pantalla de inicio. El dominio debe ser HTTPS; un quick
+tunnel de Cloudflare sirve para pruebas, pero para uso permanente conviene un
+túnel nombrado o dominio estable.

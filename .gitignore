@@ -52,6 +52,7 @@ app.*.map.json
 
 # Secrets and local configuration
 .env
+web_push/config.js
 
 # Codex/Firebase agent skills are installed locally and are not app source.
 .agents/

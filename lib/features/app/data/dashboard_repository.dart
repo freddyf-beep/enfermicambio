@@ -7,6 +7,7 @@ import '../../health/domain/health_models.dart';
 import '../../ranking/domain/ranking_models.dart';
 import '../../ranking/domain/ranking_service.dart';
 import '../../../shared/config/app_environment.dart';
+import '../../../shared/storage/supabase_storage_reference.dart';
 
 class AppDashboardData {
   const AppDashboardData({
@@ -29,6 +30,8 @@ class DashboardRepository {
 
   final SupabaseClient _client;
   final SupabaseFeedRepository _feed;
+  SupabaseStorageReferenceResolver get _storage =>
+      SupabaseStorageReferenceResolver(client: _client);
 
   Future<AppDashboardData> load({
     required DateTime now,
@@ -75,7 +78,17 @@ class DashboardRepository {
       }
     }
 
-    final users = profiles.cast<Map<String, dynamic>>().map((profile) {
+    final resolvedProfiles = await Future.wait(
+      profiles.cast<Map<String, dynamic>>().map((profile) async {
+        final copy = Map<String, dynamic>.from(profile);
+        copy['avatar_url'] = await _storage.resolve(
+          profile['avatar_url'] as String?,
+        );
+        return copy;
+      }),
+    );
+
+    final users = resolvedProfiles.map((profile) {
       final userId = profile['id'] as String;
       final activity = activityByUser[userId];
       final synced = activity == null ? null : _syncedAt(activity);

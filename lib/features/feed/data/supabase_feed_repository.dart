@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../shared/storage/supabase_storage_reference.dart';
 import '../../../shared/text/text_encoding.dart';
 import '../domain/feed_models.dart';
 
@@ -13,6 +14,9 @@ class SupabaseFeedRepository implements FeedRepository {
   const SupabaseFeedRepository({required this._client});
 
   final SupabaseClient _client;
+
+  SupabaseStorageReferenceResolver get _storage =>
+      SupabaseStorageReferenceResolver(client: _client);
 
   @override
   Future<FeedPage> loadLatest({required int limit}) {
@@ -90,6 +94,14 @@ class SupabaseFeedRepository implements FeedRepository {
     final mediaByPost = _groupById(related[1], 'post_id');
     final reactionCounts = _countById(related[2]);
     final commentCounts = _countById(related[3]);
+    final avatarUrls = <String, String?>{};
+    await Future.wait(
+      authorIds.map((authorId) async {
+        avatarUrls[authorId] = await _storage.resolve(
+          _string(profilesById[authorId]?['avatar_url']),
+        );
+      }),
+    );
 
     final posts = await Future.wait(
       slice.map((row) async {
@@ -108,7 +120,7 @@ class SupabaseFeedRepository implements FeedRepository {
           authorName: repairMojibake(
             _string(profile['display_name']) ?? 'Amigo',
           ),
-          authorAvatarUrl: _string(profile['avatar_url']),
+          authorAvatarUrl: avatarUrls[authorId],
           type: _mapType(_string(row['post_type']) ?? ''),
           createdAt: createdAt,
           isSystem: row['system_generated'] == true,
@@ -187,15 +199,7 @@ class SupabaseFeedRepository implements FeedRepository {
           return value;
         }
 
-        final separator = value.indexOf('/');
-        if (separator <= 0 || separator == value.length - 1) return null;
-        final bucket = value.substring(0, separator);
-        final path = value.substring(separator + 1);
-        try {
-          return await _client.storage.from(bucket).createSignedUrl(path, 3600);
-        } on Object {
-          return null;
-        }
+        return _storage.resolve(value);
       }),
     );
     return urls.whereType<String>().toList(growable: false);

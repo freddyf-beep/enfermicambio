@@ -47,14 +47,17 @@ class AppEnvironment {
   );
   static const String _appVersionDefine = String.fromEnvironment(
     'APP_VERSION',
-    defaultValue: '1.2.3',
+    defaultValue: '1.2.4',
   );
   static const int _appBuildDefine = int.fromEnvironment(
     'APP_BUILD',
-    defaultValue: 10,
+    defaultValue: 11,
   );
   static const String _releaseManifestUrlDefine = String.fromEnvironment(
     'RELEASE_MANIFEST_URL',
+  );
+  static const String _webPushBridgeUrlDefine = String.fromEnvironment(
+    'WEB_PUSH_BRIDGE_URL',
   );
 
   static String get supabaseUrl =>
@@ -117,6 +120,11 @@ class AppEnvironment {
   static String get releaseManifestUrl => _firstNonEmpty(
     _releaseManifestUrlDefine,
     _dotenvValue('RELEASE_MANIFEST_URL'),
+  );
+
+  static String get webPushBridgeUrl => _firstNonEmpty(
+    _webPushBridgeUrlDefine,
+    _dotenvValue('WEB_PUSH_BRIDGE_URL'),
   );
 
   static String get firebaseAppId {

@@ -2,6 +2,7 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { withSupabase } from "@supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import { importPKCS8, SignJWT } from "npm:jose@6.0.10";
+import webpush from "npm:web-push@3.6.7";
 
 type AdminClient = ReturnType<typeof createClient>;
 type OutboxRow = { id: string; notification_id: string; user_id: string };
@@ -13,12 +14,19 @@ type NotificationRow = {
   body: string;
   payload: Record<string, unknown> | null;
 };
-type PushDevice = {
+type NativePushDevice = {
   token: string;
   platform: "android" | "ios";
   provider: "fcm" | "apns";
   app_id: string;
 };
+type WebPushDevice = {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  provider: "web";
+};
+type PushDevice = NativePushDevice | WebPushDevice;
 type DeliveryResult = { ok: boolean; permanent: boolean; error?: string };
 
 let fcmAccessToken: { value: string; expiresAt: number } | null = null;
@@ -228,10 +236,74 @@ async function sendApns(
   };
 }
 
+function webPushConfiguration(): {
+  subject: string;
+  publicKey: string;
+  privateKey: string;
+} | null {
+  const publicKey = env("WEB_PUSH_VAPID_PUBLIC_KEY");
+  const privateKey = env("WEB_PUSH_VAPID_PRIVATE_KEY");
+  if (!publicKey || !privateKey) return null;
+  return {
+    subject: env("WEB_PUSH_VAPID_SUBJECT") || "mailto:udefret12@gmail.com",
+    publicKey,
+    privateKey,
+  };
+}
+
+async function sendWebPush(
+  device: WebPushDevice,
+  notification: NotificationRow,
+): Promise<DeliveryResult> {
+  const config = webPushConfiguration();
+  if (!config) {
+    return { ok: false, permanent: false, error: "Web Push no está configurado" };
+  }
+
+  webpush.setVapidDetails(
+    config.subject,
+    config.publicKey,
+    config.privateKey,
+  );
+  try {
+    await webpush.sendNotification(
+      {
+        endpoint: device.endpoint,
+        keys: { p256dh: device.p256dh, auth: device.auth },
+      },
+      JSON.stringify({
+        title: notification.title,
+        body: notification.body,
+        data: {
+          notification_id: notification.id,
+          type: notification.type,
+          ...stringData(notification.payload),
+        },
+        url: "/enfermicambio/push/",
+      }),
+      { TTL: 120, urgency: "high" },
+    );
+    return { ok: true, permanent: false };
+  } catch (error) {
+    const statusCode = Number(
+      (error as { statusCode?: number }).statusCode ?? 0,
+    );
+    const permanent = statusCode === 404 || statusCode === 410;
+    return {
+      ok: false,
+      permanent,
+      error: `Web Push ${statusCode || "error"}: ${String(error).slice(0, 500)}`,
+    };
+  }
+}
+
 async function sendToDevice(
   device: PushDevice,
   notification: NotificationRow,
 ): Promise<DeliveryResult> {
+  if (device.provider === "web") {
+    return sendWebPush(device, notification);
+  }
   return device.provider === "apns"
     ? sendApns(device, notification)
     : sendFcm(device, notification);
@@ -256,12 +328,28 @@ async function processOutbox(
     return { success: true, sent: 0, disabled: 0 };
   }
 
-  const { data: devices, error: devicesError } = await supabaseAdmin
-    .from("push_devices")
-    .select("token, platform, provider, app_id")
-    .eq("user_id", outbox.user_id)
-    .eq("enabled", true);
-  if (devicesError) throw new Error(devicesError.message);
+  const [nativeResult, webResult] = await Promise.all([
+    supabaseAdmin
+      .from("push_devices")
+      .select("token, platform, provider, app_id")
+      .eq("user_id", outbox.user_id)
+      .eq("enabled", true),
+    supabaseAdmin
+      .from("web_push_devices")
+      .select("endpoint, p256dh, auth")
+      .eq("user_id", outbox.user_id)
+      .eq("enabled", true),
+  ]);
+  if (nativeResult.error) throw new Error(nativeResult.error.message);
+  if (webResult.error) throw new Error(webResult.error.message);
+
+  const devices: PushDevice[] = [
+    ...((nativeResult.data ?? []) as NativePushDevice[]),
+    ...((webResult.data ?? []) as WebPushDevice[]).map((device) => ({
+      ...device,
+      provider: "web" as const,
+    })),
+  ];
 
   if ((devices?.length ?? 0) === 0) {
     const error = 'No hay dispositivos registrados para este usuario';
@@ -285,10 +373,18 @@ async function processOutbox(
       } else {
         if (result.error) errors.push(result.error);
         if (result.permanent) {
-          await supabaseAdmin
-            .from("push_devices")
-            .update({ enabled: false })
-            .eq("token", device.token);
+          if (device.provider === "web") {
+            await supabaseAdmin
+              .from("web_push_devices")
+              .update({ enabled: false })
+              .eq("user_id", outbox.user_id)
+              .eq("endpoint", device.endpoint);
+          } else {
+            await supabaseAdmin
+              .from("push_devices")
+              .update({ enabled: false })
+              .eq("token", device.token);
+          }
           disabled++;
         }
       }

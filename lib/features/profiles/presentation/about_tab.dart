@@ -1,7 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../shared/config/app_environment.dart';
 import '../../../shared/ui/app_logo.dart';
 import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
@@ -39,6 +42,7 @@ class _AboutTabState extends State<AboutTab> {
   final Map<String, ProfileHistoryStats> _stats = {};
   List<Workout>? _recentWorkouts;
   AsyncViewStatus? _status;
+  bool _avatarBusy = false;
 
   @override
   void initState() {
@@ -75,6 +79,75 @@ class _AboutTabState extends State<AboutTab> {
     }
   }
 
+  Future<void> _changeAvatar() async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null || _avatarBusy) return;
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('Elegir de la galería'),
+              onTap: () => Navigator.pop(context, ImageSource.gallery),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_camera_outlined),
+              title: const Text('Tomar una foto'),
+              onTap: () => Navigator.pop(context, ImageSource.camera),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    final image = await ImagePicker().pickImage(
+      source: source,
+      maxWidth: 1200,
+      maxHeight: 1200,
+      imageQuality: 84,
+    );
+    if (image == null || !mounted) return;
+
+    setState(() {
+      _avatarBusy = true;
+    });
+    try {
+      final contentType =
+          image.mimeType ??
+          (image.path.toLowerCase().endsWith('.png')
+              ? 'image/png'
+              : 'image/jpeg');
+      final updated = await _repository.uploadAvatar(
+        userId: userId,
+        filePath: image.path,
+        contentType: contentType,
+      );
+      if (!mounted) return;
+      final profiles = [...?_profiles];
+      final index = profiles.indexWhere((profile) => profile.id == userId);
+      if (index >= 0) profiles[index] = updated;
+      setState(() {
+        _profiles = profiles;
+        _avatarBusy = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Foto de perfil actualizada.')),
+      );
+    } on Exception catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _avatarBusy = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo guardar la foto: $error')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_profiles == null) {
@@ -86,6 +159,14 @@ class _AboutTabState extends State<AboutTab> {
           child: const SizedBox(),
         ),
       );
+    }
+    final currentUserId = Supabase.instance.client.auth.currentUser?.id;
+    UserProfile? currentProfile;
+    for (final profile in _profiles!) {
+      if (profile.id == currentUserId) {
+        currentProfile = profile;
+        break;
+      }
     }
     return Scaffold(
       appBar: AppBar(
@@ -118,6 +199,39 @@ class _AboutTabState extends State<AboutTab> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           children: [
+            if (currentProfile != null) ...[
+              Card(
+                child: ListTile(
+                  leading: _ProfileAvatar(
+                    name: currentProfile.displayName,
+                    imageUrl: currentProfile.avatarUrl,
+                    radius: 26,
+                  ),
+                  title: const Text(
+                    'Mi perfil',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    _avatarBusy
+                        ? 'Guardando foto…'
+                        : 'Añade una foto para que tus amigos te reconozcan.',
+                  ),
+                  trailing: _avatarBusy
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : IconButton(
+                          tooltip: 'Cambiar foto',
+                          onPressed: _changeAvatar,
+                          icon: const Icon(Icons.camera_alt_outlined),
+                        ),
+                  onTap: _avatarBusy ? null : _changeAvatar,
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             const _SectionHeader(title: 'Los 4 Amigos', icon: Icons.group),
             const SizedBox(height: 8),
             for (final profile in _profiles!)
@@ -471,6 +585,12 @@ class _PushNotificationStatusCardState
     await _service.refreshRegistration();
   }
 
+  Future<void> _openWebBridge() async {
+    final uri = Uri.tryParse(AppEnvironment.webPushBridgeUrl);
+    if (uri == null) return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<PushNotificationStatus>(
@@ -522,6 +642,16 @@ class _PushNotificationStatusCardState
                         style: Theme.of(context).textTheme.labelSmall,
                       ),
                     ],
+                    if (defaultTargetPlatform == TargetPlatform.iOS &&
+                        !status.isRegistered &&
+                        AppEnvironment.webPushBridgeUrl.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      OutlinedButton.icon(
+                        onPressed: _openWebBridge,
+                        icon: const Icon(Icons.public, size: 17),
+                        label: const Text('Activar puente web para iPhone'),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -559,16 +689,21 @@ class _ProfileTile extends StatelessWidget {
             CircleAvatar(
               radius: 28,
               backgroundColor: AppColors.primaryLight.withValues(alpha: 0.2),
-              child: Text(
-                profile.displayName.isEmpty
-                    ? '?'
-                    : profile.displayName[0].toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primaryLight,
-                ),
-              ),
+              backgroundImage: profile.avatarUrl == null
+                  ? null
+                  : NetworkImage(profile.avatarUrl!),
+              child: profile.avatarUrl == null
+                  ? Text(
+                      profile.displayName.isEmpty
+                          ? '?'
+                          : profile.displayName[0].toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primaryLight,
+                      ),
+                    )
+                  : null,
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -625,5 +760,35 @@ class _ProfileTile extends StatelessWidget {
     final km = meters / 1000;
     if (km >= 100) return km.round().toString();
     return km.toStringAsFixed(1);
+  }
+}
+
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({
+    required this.name,
+    required this.imageUrl,
+    required this.radius,
+  });
+
+  final String name;
+  final String? imageUrl;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: AppColors.primaryLight.withValues(alpha: 0.2),
+      backgroundImage: imageUrl == null ? null : NetworkImage(imageUrl!),
+      child: imageUrl == null
+          ? Text(
+              name.isEmpty ? '?' : name[0].toUpperCase(),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: AppColors.primaryLight,
+              ),
+            )
+          : null,
+    );
   }
 }
