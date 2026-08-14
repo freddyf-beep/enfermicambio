@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -19,6 +20,16 @@ Future<void> main() async {
   await dotenv.load(isOptional: true);
   await initializeDateFormatting('es');
   timezone_data.initializeTimeZones();
+
+  if (AppEnvironment.isFirebaseConfigured) {
+    try {
+      await Firebase.initializeApp(options: AppEnvironment.firebaseOptions!);
+    } on Exception {
+      // Firebase remains optional during the Supabase compatibility phase.
+      // Auth/Firestore surfaces report their own setup error instead of
+      // preventing the rest of the app from rendering.
+    }
+  }
 
   if (AppEnvironment.isConfigured) {
     try {

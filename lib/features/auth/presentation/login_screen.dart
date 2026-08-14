@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
+import 'package:firebase_core/firebase_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../shared/config/app_environment.dart';
 import '../../../shared/ui/app_logo.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
+import '../data/firebase_auth_service.dart';
+import '../data/firebase_profile_repository.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,8 +21,20 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController(text: 'CambiarEsto123!');
+  late final FirebaseAuthService _firebaseAuth;
+  late final FirebaseProfileRepository _firebaseProfiles;
   bool _isBusy = false;
   AsyncViewStatus? _status;
+
+  bool get _firebaseMode =>
+      AppEnvironment.firebaseAuthEnabled && Firebase.apps.isNotEmpty;
+
+  @override
+  void initState() {
+    super.initState();
+    _firebaseAuth = FirebaseAuthService();
+    _firebaseProfiles = FirebaseProfileRepository();
+  }
 
   @override
   void dispose() {
@@ -32,6 +49,26 @@ class _LoginScreenState extends State<LoginScreen> {
       _status = null;
     });
     try {
+      if (_firebaseMode) {
+        final firebaseCredential = await _firebaseAuth.signInWithGoogle();
+        if (firebaseCredential == null) {
+          if (!mounted) return;
+          setState(() {
+            _isBusy = false;
+            _status = const AsyncViewStatus.retryableFailure(
+              'El inicio de sesión con Google fue cancelado.',
+            );
+          });
+          return;
+        }
+        await _saveFirebaseProfile(firebaseCredential.user);
+        await _bridgeGoogleSessionToSupabase(firebaseCredential);
+        if (!mounted) return;
+        setState(() {
+          _isBusy = false;
+        });
+        return;
+      }
       final googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) {
         setState(() {
@@ -69,6 +106,24 @@ class _LoginScreenState extends State<LoginScreen> {
       _status = null;
     });
     try {
+      if (_firebaseMode) {
+        final firebaseCredential = await _firebaseAuth.signInWithEmail(
+          email: email,
+          password: password,
+        );
+        await _saveFirebaseProfile(firebaseCredential.user);
+        // Existing feature repositories still use Supabase. Keeping both
+        // sessions alive lets the migration happen without breaking the app.
+        await Supabase.instance.client.auth.signInWithPassword(
+          email: email,
+          password: password,
+        );
+        if (!mounted) return;
+        setState(() {
+          _isBusy = false;
+        });
+        return;
+      }
       await Supabase.instance.client.auth.signInWithPassword(
         email: email,
         password: password,
@@ -87,6 +142,47 @@ class _LoginScreenState extends State<LoginScreen> {
         _status = AsyncViewStatus.backendError(error.toString());
       });
     }
+  }
+
+  Future<void> _saveFirebaseProfile(firebase_auth.User? user) async {
+    if (user == null) return;
+    try {
+      await _firebaseProfiles.upsertFromAuthUser(user);
+    } on Exception {
+      // Firestore rules/database provisioning can be completed independently
+      // of Auth. A temporary profile write failure must not discard a valid
+      // Firebase session.
+    }
+  }
+
+  Future<void> _bridgeGoogleSessionToSupabase(
+    firebase_auth.UserCredential credential,
+  ) async {
+    final oauth = credential.credential;
+    if (oauth is! firebase_auth.OAuthCredential || oauth.idToken == null) {
+      throw const AuthException(
+        'Google entregó una sesión de Firebase, pero falta el token compatible con la sesión de datos actual.',
+      );
+    }
+    await Supabase.instance.client.auth.signInWithIdToken(
+      provider: OAuthProvider.google,
+      idToken: oauth.idToken!,
+      accessToken: oauth.accessToken,
+    );
+  }
+
+  Future<void> _signInWithPhone() async {
+    if (!_firebaseMode) return;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (_) => _FirebasePhoneDialog(service: _firebaseAuth),
+    );
+    if (!mounted || result != true) return;
+    setState(() {
+      _status = const AsyncViewStatus.retryableFailure(
+        'Teléfono verificado en Firebase. La sesión de datos de la app todavía requiere completar la migración desde Supabase.',
+      );
+    });
   }
 
   void _quickFillUser(String email, String name) {
@@ -215,6 +311,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: const Text('Iniciar Sesión'),
                 ),
+                if (_firebaseMode) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _isBusy ? null : _signInWithPhone,
+                    icon: const Icon(Icons.sms_outlined),
+                    label: const Text('Continuar con teléfono'),
+                  ),
+                ],
                 if (_isBusy) ...[
                   const SizedBox(height: 24),
                   const LinearProgressIndicator(),
@@ -228,6 +332,135 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _FirebasePhoneDialog extends StatefulWidget {
+  const _FirebasePhoneDialog({required this.service});
+
+  final FirebaseAuthService service;
+
+  @override
+  State<_FirebasePhoneDialog> createState() => _FirebasePhoneDialogState();
+}
+
+class _FirebasePhoneDialogState extends State<_FirebasePhoneDialog> {
+  final _phoneController = TextEditingController();
+  final _codeController = TextEditingController();
+  String? _verificationId;
+  String? _error;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendCode() async {
+    final phone = _phoneController.text.trim();
+    if (phone.isEmpty) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    await widget.service.startPhoneVerification(
+      phoneNumber: phone,
+      onCodeSent: (verificationId) {
+        if (!mounted) return;
+        setState(() {
+          _verificationId = verificationId;
+          _busy = false;
+        });
+      },
+      onVerificationFailed: (error) {
+        if (!mounted) return;
+        setState(() {
+          _busy = false;
+          _error = error.message ?? error.code;
+        });
+      },
+      onAutoVerified: (_) {
+        if (mounted) Navigator.of(context).pop(true);
+      },
+      onCodeAutoRetrievalTimeout: (verificationId) {
+        if (!mounted) return;
+        setState(() {
+          _verificationId = verificationId;
+          _busy = false;
+        });
+      },
+    );
+  }
+
+  Future<void> _confirmCode() async {
+    final verificationId = _verificationId;
+    final code = _codeController.text.trim();
+    if (verificationId == null || code.isEmpty) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await widget.service.confirmPhoneCode(
+        verificationId: verificationId,
+        smsCode: code,
+      );
+      if (mounted) Navigator.of(context).pop(true);
+    } on firebase_auth.FirebaseAuthException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = error.message ?? error.code;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Verificar teléfono'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Número con código de país',
+                hintText: '+56912345678',
+              ),
+            ),
+            if (_verificationId != null) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _codeController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Código SMS'),
+              ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!, style: TextStyle(color: Colors.red)),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _busy
+              ? null
+              : (_verificationId == null ? _sendCode : _confirmCode),
+          child: Text(_verificationId == null ? 'Enviar código' : 'Confirmar'),
+        ),
+      ],
     );
   }
 }

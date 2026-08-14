@@ -53,6 +53,8 @@ dependencies:
   firebase_messaging: ^16.5.0
   google_maps_flutter: 2.18.0
   apple_maps_flutter: 1.4.0
+  firebase_auth: ^6.5.7
+  cloud_firestore: ^6.8.0
  
 dev_dependencies:
   flutter_test:

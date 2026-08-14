@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "653478025767",
+    "project_id": "enfermicambio-98b5a",
+    "storage_bucket": "enfermicambio-98b5a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:653478025767:android:2e28708f25f575e3414c02",
+        "android_client_info": {
+          "package_name": "com.enfermicambio.enfermicambio"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "653478025767-biufgjrkemt3v5mcg67d4l3lbltpuo4u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.enfermicambio.enfermicambio",
+            "certificate_hash": "0bdaa52e18bd87223e4b3239366c6b0551ef745b"
+          }
+        },
+        {
+          "client_id": "653478025767-qhr6f719v7bsarulml88kiso5l63tcs9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCzNcwF7zrUJ0W1d6izxkgNI9LhFBabmjI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "653478025767-qhr6f719v7bsarulml88kiso5l63tcs9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "653478025767-adt3a9h14n0443b2do968lhbddf3bc53.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.enfermicambio.enfermicambio"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

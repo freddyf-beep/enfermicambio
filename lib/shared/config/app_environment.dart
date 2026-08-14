@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:timezone/data/latest.dart' as timezone_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../firebase_options.dart';
+
 /// Resolves app configuration with a safe fallback chain:
 ///   1. --dart-define values (used in release builds via CI)
 ///   2. .env file (local development)
@@ -38,6 +40,10 @@ class AppEnvironment {
   );
   static const String _firebaseIosBundleIdDefine = String.fromEnvironment(
     'FIREBASE_IOS_BUNDLE_ID',
+  );
+  static const String _firebaseAuthEnabledDefine = String.fromEnvironment(
+    'FIREBASE_AUTH_ENABLED',
+    defaultValue: 'false',
   );
   static const String _appVersionDefine = String.fromEnvironment(
     'APP_VERSION',
@@ -77,7 +83,10 @@ class AppEnvironment {
 
   static String get firebaseProjectId => _firstNonEmpty(
     _firebaseProjectIdDefine,
-    _dotenvValue('FIREBASE_PROJECT_ID'),
+    _firstNonEmpty(
+      _dotenvValue('FIREBASE_PROJECT_ID'),
+      _generatedFirebaseProjectId,
+    ),
   );
 
   static String get firebaseStorageBucket => _firstNonEmpty(
@@ -88,6 +97,17 @@ class AppEnvironment {
   static String get firebaseIosBundleId => _firstNonEmpty(
     _firebaseIosBundleIdDefine,
     _dotenvValue('FIREBASE_IOS_BUNDLE_ID'),
+  );
+
+  /// Enables the Firebase Authentication surface without silently replacing
+  /// the existing Supabase data session. The complete data migration is a
+  /// separate step because the current feature repositories still use
+  /// Supabase RLS and RPCs.
+  static bool get firebaseAuthEnabled => _isTrue(
+    _firstNonEmpty(
+      _firebaseAuthEnabledDefine,
+      _dotenvValue('FIREBASE_AUTH_ENABLED'),
+    ),
   );
 
   static String get appVersion => _appVersionDefine;
@@ -109,28 +129,47 @@ class AppEnvironment {
     return _firstNonEmpty(define, _dotenvValue(name));
   }
 
-  static bool get isFirebaseConfigured =>
+  static bool get isFirebaseConfigured => firebaseOptions != null;
+
+  static FirebaseOptions? get firebaseOptions {
+    if (_hasManualFirebaseConfig) {
+      return FirebaseOptions(
+        apiKey: firebaseApiKey,
+        appId: firebaseAppId,
+        messagingSenderId: firebaseMessagingSenderId,
+        projectId: firebaseProjectId,
+        storageBucket: firebaseStorageBucket.isEmpty
+            ? null
+            : firebaseStorageBucket,
+        iosBundleId: defaultTargetPlatform == TargetPlatform.iOS
+            ? (firebaseIosBundleId.isEmpty
+                  ? 'com.enfermicambio.enfermicambio'
+                  : firebaseIosBundleId)
+            : null,
+      );
+    }
+    try {
+      return DefaultFirebaseOptions.currentPlatform;
+    } on UnsupportedError {
+      return null;
+    }
+  }
+
+  static bool get _hasManualFirebaseConfig =>
       firebaseApiKey.isNotEmpty &&
       firebaseAppId.isNotEmpty &&
       firebaseMessagingSenderId.isNotEmpty &&
-      firebaseProjectId.isNotEmpty;
+      _firstNonEmpty(
+        _firebaseProjectIdDefine,
+        _dotenvValue('FIREBASE_PROJECT_ID'),
+      ).isNotEmpty;
 
-  static FirebaseOptions? get firebaseOptions {
-    if (!isFirebaseConfigured) return null;
-    return FirebaseOptions(
-      apiKey: firebaseApiKey,
-      appId: firebaseAppId,
-      messagingSenderId: firebaseMessagingSenderId,
-      projectId: firebaseProjectId,
-      storageBucket: firebaseStorageBucket.isEmpty
-          ? null
-          : firebaseStorageBucket,
-      iosBundleId: defaultTargetPlatform == TargetPlatform.iOS
-          ? (firebaseIosBundleId.isEmpty
-                ? 'com.enfermicambio.enfermicambio'
-                : firebaseIosBundleId)
-          : null,
-    );
+  static String get _generatedFirebaseProjectId {
+    try {
+      return DefaultFirebaseOptions.currentPlatform.projectId;
+    } on UnsupportedError {
+      return '';
+    }
   }
 
   /// Fecha de competencia de hoy como 'yyyy-MM-dd'. Los 4 dispositivos del
@@ -150,6 +189,10 @@ class AppEnvironment {
 
   static String _firstNonEmpty(String primary, String fallback) {
     return primary.isNotEmpty ? primary : fallback;
+  }
+
+  static bool _isTrue(String value) {
+    return value.trim().toLowerCase() == 'true' || value.trim() == '1';
   }
 
   static String _dotenvValue(String name) {

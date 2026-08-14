@@ -1,0 +1,23 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "auth": {
+    "authorizedDomains": [
+      "localhost"
+    ],
+    "providers": {
+      "emailPassword": true,
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "EnfermiCambio",
+        "supportEmail": "udefret12@gmail.com",
+        "authorizedRedirectUris": [
+          "https://enfermicambio-98b5a.firebaseapp.com/__/auth/handler",
+          "https://enfermicambio-98b5a.web.app/__/auth/handler",
+          "http://localhost"
+        ]
+      }
+    }
+  }
+}

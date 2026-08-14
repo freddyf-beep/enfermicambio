@@ -1,0 +1,101 @@
+rules_version = '2';
+
+// Prototype Firestore rules for the Firebase Auth migration.
+//
+// Collections containing private identifiers are separated from the public
+// profile collection. The app must never put an email or phone number in a
+// document that another member can read.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function hasOnly(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequired(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function validUid(uid) {
+      return uid is string && uid.size() > 0 && uid.size() <= 128;
+    }
+
+    function validOptionalString(field, maxLength) {
+      return !(field in request.resource.data) ||
+        request.resource.data[field] == null ||
+        (request.resource.data[field] is string &&
+         request.resource.data[field].size() <= maxLength);
+    }
+
+    function validTimestamp(field) {
+      return request.resource.data[field] is timestamp;
+    }
+
+    function validPublicProfile(uid) {
+      return hasOnly(['uid', 'displayName', 'photoUrl', 'createdAt', 'updatedAt']) &&
+        hasRequired(['uid', 'displayName', 'createdAt', 'updatedAt']) &&
+        validUid(request.resource.data.uid) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() <= 80 &&
+        validOptionalString('photoUrl', 2048) &&
+        validTimestamp('createdAt') &&
+        validTimestamp('updatedAt');
+    }
+
+    function validPrivateProfile(uid) {
+      return hasOnly([
+          'uid',
+          'email',
+          'phoneNumber',
+          'emailVerified',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        hasRequired(['uid', 'emailVerified', 'createdAt', 'updatedAt']) &&
+        validUid(request.resource.data.uid) &&
+        request.resource.data.uid == uid &&
+        validOptionalString('email', 320) &&
+        validOptionalString('phoneNumber', 32) &&
+        request.resource.data.emailVerified is bool &&
+        validTimestamp('createdAt') &&
+        validTimestamp('updatedAt');
+    }
+
+    match /users_public/{uid} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(uid) && validPublicProfile(uid);
+      allow update: if isOwner(uid) &&
+        validPublicProfile(uid) &&
+        request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isOwner(uid);
+    }
+
+    match /users_private/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && validPrivateProfile(uid);
+      allow update: if isOwner(uid) &&
+        validPrivateProfile(uid) &&
+        request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isOwner(uid);
+    }
+
+    // Membership is provisioned by the owner/admin. A member can inspect only
+    // its own membership; clients cannot grant themselves access.
+    match /members/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
