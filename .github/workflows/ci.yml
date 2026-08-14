@@ -34,7 +34,7 @@ jobs:
         run: flutter test
 
   build-android:
-    name: Build Android debug APK
+    name: Build Android release APK
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -56,7 +56,7 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build debug APK
+      - name: Build release APK
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -68,7 +68,7 @@ jobs:
           FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
         run: |
-          flutter build apk --debug \
+          flutter build apk --release \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
             --dart-define=COMPETITION_TZ="$COMPETITION_TZ" \
@@ -82,8 +82,8 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: app-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
 
   # iOS builds require macOS and signing. This job produces an unsigned
   # build for CI verification only; signed distribution stays manual until

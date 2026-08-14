@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'local_notification_service.dart';
+import 'push_notification_service.dart';
 
 /// Fallback bridge for database notifications while the app process is alive.
 /// When the app is in the foreground the in-app badge and list already signal
@@ -82,6 +83,12 @@ class NotificationDeliveryCoordinator {
 
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     if (lifecycle == AppLifecycleState.resumed) return;
+
+    // Once FCM has registered this device, the remote notification is the
+    // delivery path. Realtime remains the fallback for builds without a
+    // usable push token; using both paths would show duplicate alerts while
+    // the app is in the background.
+    if (PushNotificationService.ensure().status.value.isRegistered) return;
 
     final title = (record['title'] as String?) ?? 'Enfermicambio';
     final body = (record['body'] as String?) ?? '';

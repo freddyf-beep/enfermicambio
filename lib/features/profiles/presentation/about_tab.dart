@@ -11,6 +11,7 @@ import '../../health/data/health_plugin_repository.dart';
 import '../../health/presentation/health_setup_screen.dart';
 import '../../health/presentation/health_auto_export_setup_screen.dart';
 import '../../nutrition/presentation/calorie_plan_screen.dart';
+import '../../notifications/data/push_notification_service.dart';
 import '../../notifications/data/supabase_notification_repository.dart';
 import '../../notifications/domain/notification_models.dart';
 import '../../weight/presentation/weight_screen.dart';
@@ -432,6 +433,8 @@ class _NotificationPreferencesSectionState
             )
           : Column(
               children: [
+                const _PushNotificationStatusCard(),
+                const Divider(height: 1),
                 for (final category in NotificationCategory.values)
                   SwitchListTile(
                     dense: true,
@@ -441,6 +444,98 @@ class _NotificationPreferencesSectionState
                   ),
               ],
             ),
+    );
+  }
+}
+
+class _PushNotificationStatusCard extends StatefulWidget {
+  const _PushNotificationStatusCard();
+
+  @override
+  State<_PushNotificationStatusCard> createState() =>
+      _PushNotificationStatusCardState();
+}
+
+class _PushNotificationStatusCardState
+    extends State<_PushNotificationStatusCard> {
+  late final PushNotificationService _service;
+
+  @override
+  void initState() {
+    super.initState();
+    _service = PushNotificationService.ensure();
+    _service.start();
+  }
+
+  Future<void> _retry() async {
+    await _service.refreshRegistration();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<PushNotificationStatus>(
+      valueListenable: _service.status,
+      builder: (context, status, _) {
+        final color = switch (status.state) {
+          PushRegistrationState.registered => AppColors.fitnessGreen,
+          PushRegistrationState.initializing => AppColors.primaryLight,
+          PushRegistrationState.idle => AppColors.primaryLight,
+          _ => Colors.orangeAccent,
+        };
+        final icon = switch (status.state) {
+          PushRegistrationState.registered => Icons.notifications_active,
+          PushRegistrationState.permissionDenied =>
+            Icons.notifications_off_outlined,
+          PushRegistrationState.apnsUnavailable => Icons.phone_iphone,
+          PushRegistrationState.error => Icons.error_outline,
+          _ => Icons.notifications_none,
+        };
+        final title = status.isRegistered
+            ? 'Avisos del teléfono activos'
+            : 'Avisos del teléfono';
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      status.detail.isEmpty
+                          ? 'Comprobando el registro de este dispositivo…'
+                          : status.detail,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                    if (status.platform != null && status.isRegistered) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        status.platform!,
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Reintentar registro',
+                onPressed: status.state == PushRegistrationState.initializing
+                    ? null
+                    : _retry,
+                icon: const Icon(Icons.refresh),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

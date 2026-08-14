@@ -263,6 +263,16 @@ async function processOutbox(
     .eq("enabled", true);
   if (devicesError) throw new Error(devicesError.message);
 
+  if ((devices?.length ?? 0) === 0) {
+    const error = 'No hay dispositivos registrados para este usuario';
+    await supabaseAdmin.rpc('finish_push_outbox', {
+      p_id: outbox.id,
+      p_success: false,
+      p_error: error,
+    });
+    return { success: false, sent: 0, disabled: 0, error };
+  }
+
   let sent = 0;
   let disabled = 0;
   const errors: string[] = [];
@@ -287,7 +297,7 @@ async function processOutbox(
     }
   }
 
-  const success = sent > 0 || (devices?.length ?? 0) === 0;
+  const success = sent > 0;
   await supabaseAdmin.rpc("finish_push_outbox", {
     p_id: outbox.id,
     p_success: success,
