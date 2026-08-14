@@ -23,6 +23,7 @@ import '../../../shared/ui/app_tab_navigator.dart';
 import '../../../shared/ui/app_theme.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
+import '../../../shared/update/release_update_banner.dart';
 import 'widgets/home_dashboard_widgets.dart';
 
 class HomeTab extends StatefulWidget {
@@ -354,6 +355,7 @@ class _HomeTabState extends State<HomeTab> {
                 onRefresh: _load,
                 onShare: _shareDailySummary,
               ),
+              const ReleaseUpdateBanner(),
               if (_status?.state == AsyncState.offline) ...[
                 const SizedBox(height: 12),
                 Card(

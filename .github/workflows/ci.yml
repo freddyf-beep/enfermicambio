@@ -67,7 +67,10 @@ jobs:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+          RELEASE_MANIFEST_URL: ${{ vars.RELEASE_MANIFEST_URL || 'https://invisible-tiffany-improvements-compound.trycloudflare.com/enfermicambio/releases/latest.json' }}
         run: |
+          APP_VERSION="$(sed -n 's/^version: \([^+]*\)+.*$/\1/p' pubspec.yaml)"
+          APP_BUILD="$(sed -n 's/^version: .*+\([0-9]*\)$/\1/p' pubspec.yaml)"
           flutter build apk --release \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
@@ -77,6 +80,9 @@ jobs:
             --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID" \
             --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
             --dart-define=FIREBASE_STORAGE_BUCKET="$FIREBASE_STORAGE_BUCKET" \
+            --dart-define=APP_VERSION="$APP_VERSION" \
+            --dart-define=APP_BUILD="$APP_BUILD" \
+            --dart-define=RELEASE_MANIFEST_URL="$RELEASE_MANIFEST_URL" \
             -PgoogleMapsApiKey="$GOOGLE_MAPS_API_KEY"
 
       - name: Upload APK artifact
@@ -120,7 +126,10 @@ jobs:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           FIREBASE_IOS_BUNDLE_ID: ${{ secrets.FIREBASE_IOS_BUNDLE_ID || 'com.enfermicambio.enfermicambio' }}
+          RELEASE_MANIFEST_URL: ${{ vars.RELEASE_MANIFEST_URL || 'https://invisible-tiffany-improvements-compound.trycloudflare.com/enfermicambio/releases/latest.json' }}
         run: |
+          APP_VERSION="$(sed -n 's/^version: \([^+]*\)+.*$/\1/p' pubspec.yaml)"
+          APP_BUILD="$(sed -n 's/^version: .*+\([0-9]*\)$/\1/p' pubspec.yaml)"
           flutter build ios --release --no-codesign \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
@@ -130,7 +139,10 @@ jobs:
             --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID" \
             --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
             --dart-define=FIREBASE_STORAGE_BUCKET="$FIREBASE_STORAGE_BUCKET" \
-            --dart-define=FIREBASE_IOS_BUNDLE_ID="$FIREBASE_IOS_BUNDLE_ID"
+            --dart-define=FIREBASE_IOS_BUNDLE_ID="$FIREBASE_IOS_BUNDLE_ID" \
+            --dart-define=APP_VERSION="$APP_VERSION" \
+            --dart-define=APP_BUILD="$APP_BUILD" \
+            --dart-define=RELEASE_MANIFEST_URL="$RELEASE_MANIFEST_URL"
 
       - name: Package unsigned IPA for sideloading
         run: |

@@ -39,6 +39,17 @@ class AppEnvironment {
   static const String _firebaseIosBundleIdDefine = String.fromEnvironment(
     'FIREBASE_IOS_BUNDLE_ID',
   );
+  static const String _appVersionDefine = String.fromEnvironment(
+    'APP_VERSION',
+    defaultValue: '1.2.3',
+  );
+  static const int _appBuildDefine = int.fromEnvironment(
+    'APP_BUILD',
+    defaultValue: 10,
+  );
+  static const String _releaseManifestUrlDefine = String.fromEnvironment(
+    'RELEASE_MANIFEST_URL',
+  );
 
   static String get supabaseUrl =>
       _firstNonEmpty(_supabaseUrlDefine, _dotenvValue('SUPABASE_URL'));
@@ -77,6 +88,15 @@ class AppEnvironment {
   static String get firebaseIosBundleId => _firstNonEmpty(
     _firebaseIosBundleIdDefine,
     _dotenvValue('FIREBASE_IOS_BUNDLE_ID'),
+  );
+
+  static String get appVersion => _appVersionDefine;
+
+  static int get appBuild => _appBuildDefine;
+
+  static String get releaseManifestUrl => _firstNonEmpty(
+    _releaseManifestUrlDefine,
+    _dotenvValue('RELEASE_MANIFEST_URL'),
   );
 
   static String get firebaseAppId {
