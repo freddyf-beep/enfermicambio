@@ -546,7 +546,7 @@ class _NotificationPreferencesSectionState
                 ),
               ),
             )
-            : Column(
+          : Column(
               children: [
                 const _PushNotificationStatusCard(),
                 const Divider(height: 1),

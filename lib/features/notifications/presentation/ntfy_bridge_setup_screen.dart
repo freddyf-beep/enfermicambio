@@ -52,7 +52,9 @@ class _NtfyBridgeSetupScreenState extends State<NtfyBridgeSetupScreen> {
   Future<void> _copy(String value, String message) async {
     await Clipboard.setData(ClipboardData(text: value));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _openChannel() async {
@@ -86,10 +88,8 @@ class _NtfyBridgeSetupScreenState extends State<NtfyBridgeSetupScreen> {
                 _subscription!.topic,
                 'Tópico copiado. Pégalo en la app ntfy.',
               ),
-              onCopyUrl: () => _copy(
-                _subscription!.url.toString(),
-                'Enlace copiado.',
-              ),
+              onCopyUrl: () =>
+                  _copy(_subscription!.url.toString(), 'Enlace copiado.'),
             ),
     );
   }
@@ -127,9 +127,9 @@ class _ReadyState extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   'Puente ntfy listo',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -138,9 +138,9 @@ class _ReadyState extends StatelessWidget {
                 const SizedBox(height: 16),
                 SelectableText(
                   subscription.topic,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    fontFamily: 'monospace',
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -167,17 +167,20 @@ class _ReadyState extends StatelessWidget {
         const _Instruction(
           number: '1',
           title: 'Instala ntfy',
-          body: 'Descarga ntfy gratis desde la App Store y acepta sus notificaciones.',
+          body:
+              'Descarga ntfy gratis desde la App Store y acepta sus notificaciones.',
         ),
         const _Instruction(
           number: '2',
           title: 'Abre tu canal',
-          body: 'Pulsa el botón de abajo. Si se abre Safari, copia el tópico y agrégalo desde la app ntfy.',
+          body:
+              'Pulsa el botón de abajo. Si se abre Safari, copia el tópico y agrégalo desde la app ntfy.',
         ),
         const _Instruction(
           number: '3',
           title: 'Terminado',
-          body: 'Desde ese momento los avisos del feed, rondas, logros y mensajes llegarán al iPhone bloqueado.',
+          body:
+              'Desde ese momento los avisos del feed, rondas, logros y mensajes llegarán al iPhone bloqueado.',
         ),
         const SizedBox(height: 12),
         FilledButton.icon(
@@ -188,9 +191,9 @@ class _ReadyState extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           'No compartas este tópico: quien lo tenga puede suscribirse al canal.',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.orangeAccent,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: Colors.orangeAccent),
         ),
       ],
     );
@@ -231,7 +234,10 @@ class _Instruction extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 3),
                 Text(body),
               ],

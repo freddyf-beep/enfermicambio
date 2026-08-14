@@ -20,15 +20,15 @@ class NtfySubscription {
 /// authenticated RPC. It is a capability, so the app never exposes a list of
 /// other users' topics.
 class NtfyBridgeService {
-  NtfyBridgeService({required SupabaseClient client}) : _client = client;
+  NtfyBridgeService({required this.client});
 
-  final SupabaseClient _client;
+  final SupabaseClient client;
 
   Future<NtfySubscription> getOrCreateSubscription() async {
-    if (_client.auth.currentSession == null) {
+    if (client.auth.currentSession == null) {
       throw StateError('Inicia sesión para configurar los avisos.');
     }
-    final response = await _client.rpc('get_or_create_ntfy_subscription');
+    final response = await client.rpc('get_or_create_ntfy_subscription');
     final rows = response is List ? response : [response];
     Map? first;
     for (final row in rows) {
