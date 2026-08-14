@@ -47,14 +47,16 @@ class AppEnvironment {
   );
   static const String _appVersionDefine = String.fromEnvironment(
     'APP_VERSION',
-    defaultValue: '1.2.5',
+    defaultValue: '1.2.7',
   );
   static const int _appBuildDefine = int.fromEnvironment(
     'APP_BUILD',
-    defaultValue: 12,
+    defaultValue: 14,
   );
   static const String _releaseManifestUrlDefine = String.fromEnvironment(
     'RELEASE_MANIFEST_URL',
+    defaultValue:
+        'https://invisible-tiffany-improvements-compound.trycloudflare.com/enfermicambio/releases/latest.json',
   );
   static const String _webPushBridgeUrlDefine = String.fromEnvironment(
     'WEB_PUSH_BRIDGE_URL',

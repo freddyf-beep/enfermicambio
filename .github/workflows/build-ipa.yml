@@ -45,6 +45,7 @@ jobs:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
           FIREBASE_IOS_BUNDLE_ID: ${{ secrets.FIREBASE_IOS_BUNDLE_ID || 'com.enfermicambio.enfermicambio' }}
+          RELEASE_MANIFEST_URL: ${{ vars.RELEASE_MANIFEST_URL || 'https://invisible-tiffany-improvements-compound.trycloudflare.com/enfermicambio/releases/latest.json' }}
           WEB_PUSH_BRIDGE_URL: ${{ vars.WEB_PUSH_BRIDGE_URL || 'https://invisible-tiffany-improvements-compound.trycloudflare.com/enfermicambio/push/' }}
         run: |
           APP_VERSION="$(sed -n 's/^version: \([^+]*\)+.*$/\1/p' pubspec.yaml)"
@@ -61,6 +62,7 @@ jobs:
             --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID" \
             --dart-define=FIREBASE_STORAGE_BUCKET="$FIREBASE_STORAGE_BUCKET" \
             --dart-define=FIREBASE_IOS_BUNDLE_ID="$FIREBASE_IOS_BUNDLE_ID" \
+            --dart-define=RELEASE_MANIFEST_URL="$RELEASE_MANIFEST_URL" \
             --dart-define=WEB_PUSH_BRIDGE_URL="$WEB_PUSH_BRIDGE_URL" \
             --dart-define=APP_VERSION="$APP_VERSION" \
             --dart-define=APP_BUILD="$APP_BUILD"
