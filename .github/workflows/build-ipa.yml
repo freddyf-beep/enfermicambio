@@ -114,12 +114,12 @@ jobs:
           cp -r "$APP_PATH" "Payload/${EXEC_NAME}.app"
           echo "Executable exists: $(test -f Payload/${EXEC_NAME}.app/$EXEC_NAME && echo YES || echo NO)"
           echo "CFBundleExecutable in packaged plist: $(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' Payload/${EXEC_NAME}.app/Info.plist)"
-          zip -r "Enfermicambio-1.2.1-build5.ipa" Payload/
-          ls -lh "Enfermicambio-1.2.1-build5.ipa"
+          zip -r "Enfermicambio-1.2.1-build6.ipa" Payload/
+          ls -lh "Enfermicambio-1.2.1-build6.ipa"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: enfermicambio-ipa-1.2.1-build5
-          path: Enfermicambio-1.2.1-build5.ipa
+          name: enfermicambio-ipa-1.2.1-build6
+          path: Enfermicambio-1.2.1-build6.ipa
           retention-days: 30

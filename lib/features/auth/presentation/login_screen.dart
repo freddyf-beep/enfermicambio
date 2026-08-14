@@ -15,7 +15,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController(text: '123456');
+  final _passwordController = TextEditingController(text: 'CambiarEsto123!');
   bool _isBusy = false;
   AsyncViewStatus? _status;
 
@@ -92,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _quickFillUser(String email, String name) {
     setState(() {
       _emailController.text = email;
-      _passwordController.text = '123456';
+      _passwordController.text = 'CambiarEsto123!';
     });
     ScaffoldMessenger.of(
       context,
@@ -144,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
-                        'Acceso rápido: 2 de 4 cuentas activadas',
+                        'Acceso rápido: 4 de 4 cuentas activadas',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
@@ -167,26 +167,22 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     ActionChip(
                       avatar: const Icon(Icons.person, size: 16),
-                      label: const Text('Felipe'),
+                      label: const Text('Pipe'),
                       onPressed: () =>
-                          _quickFillUser('felipe.seron03@gmail.com', 'Felipe'),
+                          _quickFillUser('felipe.seron03@gmail.com', 'Pipe'),
                     ),
-                    const Tooltip(
-                      message:
-                          'La cuenta de Cristian aún no está creada en Supabase.',
-                      child: ActionChip(
-                        avatar: Icon(Icons.person, size: 16),
-                        label: Text('Cristian'),
-                        onPressed: null,
-                      ),
+                    ActionChip(
+                      avatar: const Icon(Icons.person, size: 16),
+                      label: const Text('Sami'),
+                      onPressed: () =>
+                          _quickFillUser('samineiror123@gmail.com', 'Sami'),
                     ),
-                    const Tooltip(
-                      message:
-                          'La cuenta de Samir aún no está creada en Supabase.',
-                      child: ActionChip(
-                        avatar: Icon(Icons.person, size: 16),
-                        label: Text('Samir'),
-                        onPressed: null,
+                    ActionChip(
+                      avatar: const Icon(Icons.person, size: 16),
+                      label: const Text('Cruz'),
+                      onPressed: () => _quickFillUser(
+                        'cristiancarrillo262@gmail.com',
+                        'Cruz',
                       ),
                     ),
                   ],
@@ -207,7 +203,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   controller: _passwordController,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: 'Contraseña (por defecto 123456)',
+                    labelText: 'Contraseña (por defecto compartida)',
                     border: OutlineInputBorder(),
                   ),
                 ),
