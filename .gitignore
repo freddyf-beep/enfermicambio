@@ -46,3 +46,8 @@ app.*.map.json
 
 # Secrets and local configuration
 .env
+
+# Node / Vite PWA
+node_modules/
+dist/
+*.local

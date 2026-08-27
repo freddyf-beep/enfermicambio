@@ -25,7 +25,7 @@ declare
   v_id uuid := gen_random_uuid();
 begin
   insert into auth.users (id, email, encrypted_password, email_confirmed_at)
-  values (v_id, p_email, crypt('test123456', gen_salt('bf')), now());
+  values (v_id, p_email, crypt('test-only-password-change-me', gen_salt('bf')), now());
   insert into public.profiles (id, display_name, daily_step_target, daily_calorie_target)
   values (v_id, p_name, 10000, 2200);
   return v_id;

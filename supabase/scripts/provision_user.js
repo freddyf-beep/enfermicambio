@@ -2,7 +2,7 @@
 //
 // Usage:
 //   $env:SERVICE_ROLE_KEY = "eyJ..."    # Settings -> API -> service_role (never committed)
-//   node provision_user.js udefret12@gmail.com "TemporaryPassword123!" "Diego"
+//   node provision_user.js person@example.com "UniqueTemporaryPassword!" "Display name"
 //
 // The account is created with email+password so it can sign in today; Google
 // sign-in is later linked to the same email by the provider, preserving the
