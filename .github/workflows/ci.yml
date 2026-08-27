@@ -1,117 +1,26 @@
-name: ci
+name: PWA CI
 
 on:
   push:
-    branches: [master, main]
+    branches: [master]
   pull_request:
-  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  analyze-and-test:
-    name: Analyze and test
+  test-and-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          channel: stable
-          cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Prepare environment placeholders
-        run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
-        shell: pwsh
-
-      - name: Verify formatting
-        run: dart format --output=none --set-exit-if-changed lib test
-
-      - name: Analyze
-        run: flutter analyze
-
-      - name: Run tests
-        run: flutter test
-
-  build-android:
-    name: Build Android debug APK
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
         with:
-          channel: stable
-          cache: true
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Prepare environment placeholders
-        run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
-        shell: pwsh
-
-      - name: Build debug APK
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: |
-          flutter build apk --debug \
-            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
-
-  # iOS builds require macOS and signing. This job produces an unsigned
-  # build for CI verification only; signed distribution stays manual until
-  # a real Apple developer account is configured.
-  build-ios:
-    name: Build iOS (unsigned)
-    runs-on: macos-latest
-    timeout-minutes: 40
-    # macOS runners consume the private-repository quota quickly. Run iOS
-    # verification deliberately from Actions -> Run workflow; Android and
-    # analyzer/test jobs remain automatic on every push.
-    if: ${{ github.event_name == 'workflow_dispatch' }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Prepare environment placeholders
-        run: Copy-Item .env.example .env -ErrorAction SilentlyContinue
-        shell: pwsh
-
-      - name: Build iOS (no codesign)
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: |
-          flutter build ios --debug --no-codesign \
-            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+          name: enfermicambio-pwa
+          path: dist

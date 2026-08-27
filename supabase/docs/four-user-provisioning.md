@@ -18,19 +18,19 @@ Provisioning is manual and uses the service role key. When a user signs in with 
 
 1. Collect the four email addresses. Decide each user's `display_name`.
 
-2. Run the provisioning script for each of the 4 friends (using default password '123456' for fast initial setup):
+2. Generate a different strong temporary password for each person and run the provisioning script four times. Never reuse or commit those passwords:
 
    ```powershell
    $env:SERVICE_ROLE_KEY = "eyJ..."
-   node supabase/scripts/provision_user.js "udefret12@gmail.com" "123456" "Freddy"
-   node supabase/scripts/provision_user.js "felipe@gmail.com" "123456" "Felipe"
-   node supabase/scripts/provision_user.js "cristiancarrillo262@gmail.com" "123456" "Cristian"
-   node supabase/scripts/provision_user.js "Samineiror123@gmail.com" "123456" "Samir"
+   node supabase/scripts/provision_user.js "PERSON_1_EMAIL" "UNIQUE_STRONG_PASSWORD_1" "PERSON_1_NAME"
+   node supabase/scripts/provision_user.js "PERSON_2_EMAIL" "UNIQUE_STRONG_PASSWORD_2" "PERSON_2_NAME"
+   node supabase/scripts/provision_user.js "PERSON_3_EMAIL" "UNIQUE_STRONG_PASSWORD_3" "PERSON_3_NAME"
+   node supabase/scripts/provision_user.js "PERSON_4_EMAIL" "UNIQUE_STRONG_PASSWORD_4" "PERSON_4_NAME"
    ```
 
    The script creates the `auth.users` row (email confirmed, no email verification required), then the matching `profiles` row with the same UUID, `platform=unknown`, `timezone=America/Santiago`, and the default targets.
 
-3. After provisioning, each user signs in with Google. Supabase links the Google identity to the existing account by email.
+3. Rotate any credentials that were used by the legacy Flutter quick-login screen. Each user can then sign in with Google; Supabase links that identity to the existing account by email.
 
 4. The user changes their real name and any settings in the `NOSOTROS` tab.
 

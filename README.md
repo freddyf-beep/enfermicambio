@@ -1,138 +1,60 @@
-# Enfermicambio
+# Enfermicambio 2.0
 
-A private fitness and social competition app for exactly four friends, running on two iPhones and two Android phones. Real-world movement and nutrition become the input to a private game: rankings, missions, streaks, trophies, achievements, seasons, and a shared activity feed.
+PWA privada para cuatro amigos que combina actividad automática, nutrición, competencia social y entrenamiento de fuerza. Se instala desde el navegador y no necesita App Store, Play Store, APK ni IPA.
 
-This repository currently contains the product specification and delivery plan. The app is complete only when the acceptance criteria in `SPECS.md` and the release gate in `ROADMAP.md` pass on all four devices.
+## Qué incluye
 
-## What the Finished Product Looks Like
+- Dashboard diario, ranking, feed, nutrición, temporadas, perfiles y notificaciones respaldados por Supabase.
+- Importación automática desde exportadores de Apple Health y Health Connect mediante un endpoint con token revocable.
+- Rutinas, sesiones, series, peso, cardio, superseries, calentamientos, RIR/RPE, progresión, 1RM e historial adaptados de [OpenGym](https://gitlab.com/DuarteSantos8/opengym).
+- Catálogo visual basado en [Workout Guide](https://github.com/bryllim/workout-guide), con recursos versionados y atribución CC BY-SA 4.0.
+- Funcionamiento local y offline. Con una sesión Supabase, el estado de entrenamiento se sincroniza por usuario.
 
-### First run
+## Desarrollo
 
-A new user opens the app and signs in with their pre-created account. There is no registration form; the four accounts already exist. A short onboarding explains that steps and workouts are read automatically from Apple Health or Health Connect, that manually entered steps do not count, and that the other three members can see shared fitness stats. The user connects their health source, sets a daily calorie target and step target, and lands on `HOY`.
+Requiere Node.js 24.
 
-### HOY (home)
-
-The default screen. At the top, a personal summary for today:
-
-```text
-8,420 steps   510 active kcal   1 workout   1,540 / 2,200 kcal
+```bash
+cp .env.example .env
+npm install
+npm run dev
 ```
 
-Below it, the current four-person ranking, always showing all four users, each with a `last synced` indicator:
-
-```text
-1. Diego   9,800    synced 2 min ago
-2. Nico    8,950    synced 5 min ago
-3. Pedro   8,420    synced 1 min ago
-4. Juan    7,310    stale - last sync 3 h ago
+```env
+VITE_SUPABASE_URL=https://PROJECT.supabase.co
+VITE_SUPABASE_ANON_KEY=PUBLIC_ANON_KEY
+VITE_COMPETITION_TZ=America/Santiago
 ```
 
-The rest of the screen is the shared private timeline: automatic events (step milestones, round results, overtake alerts, achievements) mixed with manual posts (photos, meals, workouts, routes). A user can react with an emoji or leave a comment on anything.
+Sin variables, la interfaz abre un modo demostración local sin conectarse a datos reales.
 
-### RANKING
+## Supabase
 
-A segmented control switches between `Today`, `Week`, and `Season`. A category selector offers steps, rounds, distance, workouts, calories, nutrition, and game points. Every view shows all four users, including users with no data yet, clearly marked. Morning, afternoon, night, and full-day step rankings are first-class views.
-
-### REGISTRAR
-
-The action tab for nutrition and social content: scan a barcode, search food, photograph a meal, create a meal, write a post, attach a location, share a workout. There is deliberately no way to enter steps.
-
-Scanning a barcode resolves the product through Open Food Facts, falling back to the group's private cache, then to USDA, then to a create-once custom food that all four users can reuse. The user picks a serving, assigns it to breakfast, lunch, dinner, snack, or other, and saves. The meal summary shows consumed, target, and remaining calories plus macro totals.
-
-### JUEGO
-
-The game screen: current season standings, today's missions, active streaks, the achievement collection, the trophy cabinet, and season history with past champions.
-
-Points are not raw steps. Daily rank pays 10/7/4/2, each round win pays +3, hitting the step goal pays +2, a workout pays +3, staying within the calorie target pays +2, missions pay variable rewards. All values are server-configurable. Points are recorded in an append-only ledger; standings are derived from it.
-
-Seasons run monthly. At season end the backend freezes standings, crowns a champion, publishes the result to the feed, and starts the next season at zero. Historical stats never reset.
-
-### NOSOTROS
-
-The four profiles: avatar, season rank, today's steps, current streaks, workouts and distance this week, season points, trophies, and lifetime stats (steps, distance, workouts, daily wins, round wins, season wins, longest streaks).
-
-### A day in the feed
-
-```text
-08:34  Diego finished a run - 6.2 km, 36 min
-09:01  Nico reached 5,000 steps
-11:58  Pedro won the morning round
-13:12  Juan logged lunch - 712 kcal [photo]
-16:21  Diego reached 10,000 steps
-18:00  Diego won the afternoon round
-19:42  Pedro finished a workout - 58 min
-21:04  Nico passed Diego by 214 steps
-00:00  Daily result: Diego takes the day
-```
-
-Leader-change events are rate-limited so the feed stays fun instead of noisy.
-
-## Architecture
-
-```text
-Flutter app (iOS + Android)
-  |-- feature modules: auth, profiles, health, activity, ranking,
-  |                    nutrition, workouts, feed, game, notifications
-  |-- Apple HealthKit (iOS) / Health Connect (Android)
-  |-- Flutter health abstraction plugin, native channels only for gaps
-  |
-Supabase
-  |-- Auth (four allowlisted accounts, no public signup)
-  |-- PostgreSQL + Row Level Security on every table
-  |-- Realtime (delivery only; the database stays authoritative)
-  |-- Private Storage (avatars, feed, meal, workout media)
-  |-- Edge Functions + scheduled jobs (round closes, points, seasons)
-```
-
-Core data rules:
-
-- Daily health aggregates upsert on `(user_id, date)`; re-syncing recalculates, never duplicates.
-- Workouts de-duplicate on `(source, external_id)` where available.
-- Food entries store nutrition snapshots; later source changes never rewrite history.
-- Season points are an append-only ledger, writable only by backend jobs.
-- All rounds and season cutoffs use one shared `competition_timezone`.
-
-## Privacy and Security
-
-- Exactly four allowlisted identities; anyone else reads nothing.
-- RLS on every table: shared reads, owner-scoped writes, service-role-only game writes.
-- Private storage buckets with signed URLs; no public media.
-- No live location tracking. Location is attached explicitly, per post.
-- Minimal permissions, requested in context. No secrets in source control.
-
-## Technology
-
-- Flutter / Dart.
-- iOS: HealthKit. Android: Health Connect.
-- Supabase: Auth, PostgreSQL, Realtime, Storage, Edge Functions.
-- Barcode scanning: `mobile_scanner`.
-- Food data: Open Food Facts first, USDA FoodData Central fallback, private group cache.
-- Maps: `flutter_map` + OpenStreetMap, or MapLibre.
-- Push: FCM/APNs.
-
-## Setup
-
-A Flutter scaffold with the Phase 0 health spike foundation exists in `lib/`. The full product is not built yet. Current commands:
-
-```powershell
-flutter pub get
-flutter analyze
-flutter test
-flutter run
-```
-
-Backend workflow:
-
-```powershell
-supabase start
-supabase db reset
+```bash
 supabase db push
+supabase functions deploy ingest_health --no-verify-jwt
 ```
 
-Configuration comes from a `.env` file based on `.env.example` (placeholders only, never committed with real values) and from the backend `app_config` table for game tuning.
+`--no-verify-jwt` es intencional: el endpoint verifica su propio bearer token aleatorio, almacenado solamente como SHA-256. Cada usuario lo genera desde **Nosotros → Importación automática de salud**.
 
-Requirements: Flutter stable, Xcode with signing for the iPhones, Android SDK with a Health Connect-capable device, a Supabase project, and physical test devices. Health behavior cannot be fully validated on simulators.
+## Compilar y alojar
 
-## Development Status
+```bash
+npm test
+npm run build
+```
 
-In active development. The backend schema (Phases 0-1) is applied to the remote Supabase project: `profiles`, `daily_activity`, full Phase 1 schema with RLS, private storage buckets, the `award_points` ledger, and standings. The Flutter app has a five-tab shell, Google/email sign-in, the HOY dashboard with live rankings and feed, RANKING with freshness indicators, REGISTRAR actions, JUEGO season standings, NOSOTROS profiles, health sync (steps + calories + distance + exercise) with offline ranking cache, nutrition domain with Open Food Facts resolution, and workout de-duplication. See `ROADMAP.md` for the phase plan, `CODESTYLE.md` for engineering rules, and `SPECS.md` for the full product definition. Device validation and full acceptance still require physical iPhone/Android testing.
+`dist/` es estático y puede publicarse en Cloudflare Pages, Netlify, Vercel, GitHub Pages o cualquier hosting web. El router usa hashes y no requiere reglas de reescritura.
+
+## Seguridad
+
+- No existe registro público; Supabase conserva la allowlist de cuatro perfiles y RLS.
+- Nunca pongas `SUPABASE_SERVICE_ROLE_KEY` en variables `VITE_*`.
+- Los tokens de salud se muestran una sola vez y pueden rotarse.
+- Las antiguas credenciales de acceso rápido fueron eliminadas. Las cuentas utilizadas por la versión Flutter deben cambiar de contraseña antes del despliegue.
+
+## Procedencia y licencias
+
+Enfermicambio se distribuye bajo **AGPL-3.0-or-later**. El motor de entrenamiento contiene trabajo adaptado de OpenGym y conserva sus avisos en [NOTICE-OPENGYM.md](NOTICE-OPENGYM.md). Las ilustraciones de Workout Guide están separadas bajo **CC BY-SA 4.0** en `public/workout-guide/`.
+
+El cliente Flutter anterior permanece en el historial de Git y su documentación está archivada en `docs/legacy-flutter/`.
