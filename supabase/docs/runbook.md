@@ -38,6 +38,25 @@ supabase migration list
 
 3. Record the result in `ROADMAP.md` checkpoint log and commit.
 
+For the gamification daily-close fix specifically:
+
+1. Apply `supabase/migrations/20260827100001_fix_evaluate_missions_ambiguity.sql`
+   (via `db push` with a correct history, or the SQL editor).
+2. Run `supabase/scripts/mission_close_day_smoke_test.sql` against the remote
+   database and confirm it prints `evaluate_missions OK` plus the streak counts.
+3. Invoke the `close_day` Edge Function once for today (or wait for the 00:10
+   cron) so streaks/achievements recompute from real activity:
+
+   ```powershell
+   $body = @{ date = (Get-Date -Format 'yyyy-MM-dd') } | ConvertTo-Json
+   Invoke-RestMethod -Uri 'https://bweynxdzovnbcjwgddar.supabase.co/functions/v1/close_day' `
+     -Method Post -Headers @{ apikey = 'sb_publishable_JS-Th9Up9BBHjI51WD4Reg_V57pz8BO' } `
+     -Body $body
+   ```
+
+4. Open the PWA at `#/game` and confirm Rachas and Logros show non-zero state
+   for users with qualifying activity.
+
 ## Rollback
 
 There is no automated rollback for forward-only migrations. Recovery paths:
