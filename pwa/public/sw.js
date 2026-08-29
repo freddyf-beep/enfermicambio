@@ -1,8 +1,10 @@
 /* Enfermicambio service worker — runtime caching (works with Vite's hashed asset names).
    Media (img/gif) cache-first; everything else network-first with offline fallback. */
-const CACHE = 'enfermicambio-pwa-v9'
+// Bumping this version makes installed iPhone PWAs discard the legacy health
+// bridge bundle (which still referenced Shortcuts) on their next online launch.
+const CACHE = 'enfermicambio-pwa-v10'
 
-// V9 refreshes the native-first shell and keeps malformed push payloads from
+// V10 refreshes the native-first shell and keeps malformed push payloads from
 // disappearing silently. Manifest and icons use the same network-first path.
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', e => {
