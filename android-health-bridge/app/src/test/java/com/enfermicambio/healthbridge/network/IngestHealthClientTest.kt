@@ -7,6 +7,7 @@ import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -49,6 +50,41 @@ class IngestHealthClientTest {
             val client = IngestHealthClient()
             val result = client.validate(PairingPayload(server.url("/").toString(), "d".repeat(64)))
             assertTrue(result is IngestResult.Success && result.validated)
+        } finally { server.shutdown() }
+    }
+
+    @Test fun real401RequiresRepairingAndDoesNotRetry() = runBlocking {
+        val server = MockWebServer()
+        server.enqueue(MockResponse().setResponseCode(401).setBody("{\"error\":\"invalid token\"}"))
+        server.start()
+        try {
+            val result = IngestHealthClient().validate(PairingPayload(server.url("/").toString(), "e".repeat(64)))
+            assertTrue(result is IngestResult.Failure)
+            result as IngestResult.Failure
+            assertEquals(401, result.httpCode)
+            assertTrue(result.requiresRepairing)
+            assertFalse(result.retryable)
+            assertFalse(result.userMessage.contains("e".repeat(64)))
+        } finally { server.shutdown() }
+    }
+
+    @Test fun timeoutLeavesSyncRetryable() = runBlocking {
+        val server = MockWebServer()
+        server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
+        server.start()
+        try {
+            val http = OkHttpClient.Builder()
+                .connectTimeout(200, TimeUnit.MILLISECONDS)
+                .readTimeout(200, TimeUnit.MILLISECONDS)
+                .writeTimeout(200, TimeUnit.MILLISECONDS)
+                .callTimeout(250, TimeUnit.MILLISECONDS)
+                .build()
+            val result = IngestHealthClient(http).validate(PairingPayload(server.url("/").toString(), "f".repeat(64)))
+            assertTrue(result is IngestResult.Failure)
+            result as IngestResult.Failure
+            assertTrue(result.retryable)
+            assertEquals(null, result.httpCode)
+            assertTrue(result.userMessage.contains("Sin conexión"))
         } finally { server.shutdown() }
     }
 
