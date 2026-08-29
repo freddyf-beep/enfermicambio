@@ -51,7 +51,7 @@ class AppEnvironment {
   );
   static const int _appBuildDefine = int.fromEnvironment(
     'APP_BUILD',
-    defaultValue: 14,
+    defaultValue: 15,
   );
   static const String _releaseManifestUrlDefine = String.fromEnvironment(
     'RELEASE_MANIFEST_URL',
@@ -76,7 +76,7 @@ class AppEnvironment {
   );
 
   static bool get isConfigured =>
-      supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
+      _isValidSupabaseUrl(supabaseUrl) && supabaseAnonKey.trim().isNotEmpty;
 
   static String get firebaseApiKey =>
       _firstNonEmpty(_firebaseApiKeyDefine, _dotenvValue('FIREBASE_API_KEY'));
@@ -203,6 +203,13 @@ class AppEnvironment {
 
   static bool _isTrue(String value) {
     return value.trim().toLowerCase() == 'true' || value.trim() == '1';
+  }
+
+  static bool _isValidSupabaseUrl(String value) {
+    final uri = Uri.tryParse(value.trim());
+    return uri != null &&
+        (uri.scheme == 'https' || uri.scheme == 'http') &&
+        uri.host.isNotEmpty;
   }
 
   static String _dotenvValue(String name) {

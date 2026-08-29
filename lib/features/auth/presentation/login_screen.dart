@@ -8,6 +8,7 @@ import '../../../shared/config/app_environment.dart';
 import '../../../shared/ui/app_logo.dart';
 import '../../../shared/ui/async_state_view.dart';
 import '../../../shared/ui/async_view_status.dart';
+import '../../../shared/update/release_update_banner.dart';
 import '../data/firebase_auth_service.dart';
 import '../data/firebase_profile_repository.dart';
 
@@ -225,6 +226,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 28),
+                const ReleaseUpdateBanner(),
+                const SizedBox(height: 12),
                 FilledButton.icon(
                   onPressed: _isBusy ? null : _signInWithGoogle,
                   icon: const Icon(Icons.g_mobiledata, size: 28),

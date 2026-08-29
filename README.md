@@ -1,5 +1,7 @@
 # Enfermicambio
 
+Estado de trabajo y próximos pasos: [`docs/CURRENT_STATUS.md`](docs/CURRENT_STATUS.md).
+
 Roadmap activo de producto y rediseño móvil: [EnfermiCambio 3.0](docs/REDESIGN_ROADMAP_V2.md).
 
 A private fitness and social competition app for exactly four friends, running on two iPhones and two Android phones. Real-world movement and nutrition become the input to a private game: rankings, missions, streaks, trophies, achievements, seasons, and a shared activity feed.

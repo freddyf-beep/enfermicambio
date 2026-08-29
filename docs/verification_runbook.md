@@ -17,10 +17,14 @@ Get-Content .env | ForEach-Object {
 }
 
 & C:\src\flutter\bin\flutter.bat build apk --release `
-  --dart-define=SUPABASE_URL=$envValues['SUPABASE_URL'] `
-  --dart-define=SUPABASE_ANON_KEY=$envValues['SUPABASE_ANON_KEY'] `
-  --dart-define=COMPETITION_TZ=$envValues['COMPETITION_TZ']
+  --dart-define="SUPABASE_URL=$($envValues['SUPABASE_URL'])" `
+  --dart-define="SUPABASE_ANON_KEY=$($envValues['SUPABASE_ANON_KEY'])" `
+  --dart-define="COMPETITION_TZ=$($envValues['COMPETITION_TZ'])"
 ```
+
+En PowerShell, `$($envValues['NOMBRE'])` es importante: evita que se pase la
+representación textual completa de la tabla (`System.Collections.Hashtable`) en
+vez del valor de la variable.
 
 El APK queda en `build/app/outputs/flutter-apk/app-release.apk`. La firma actual es
 solo para pruebas privadas; no es una firma de Play Store.
