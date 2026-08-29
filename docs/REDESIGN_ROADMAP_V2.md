@@ -62,11 +62,10 @@ sincronizar salud y participar en el grupo.
 - Guía oficial PWA: Android puede presentar un diálogo de instalación; iOS no
   ofrece ese prompt y requiere Compartir → Agregar a pantalla de inicio.
   <https://web.dev/learn/pwa/installation>
-- Health Auto Export: automatizaciones REST directas desde Apple Health.
-  <https://help.healthyapps.dev/en/health-auto-export/automations/>
-- Health Connect Webhook: exportación directa desde Health Connect hacia un
-  webhook propio en Android.
-  <https://play.google.com/store/apps/details?id=com.hcwebhook.app>
+- Conduit Health Sync: aplicación iOS gratuita y de código abierto que envía
+  HealthKit a un webhook propio. <https://github.com/noebrito/conduit>
+- Life Dashboard Companion: aplicación Android MIT con APK gratuito, Health
+  Connect Aggregate, cola y reintentos. <https://github.com/owen282000/life-dashboard-companion-app>
 
 ## Sistema visual propuesto: “Pulso privado”
 
@@ -137,10 +136,9 @@ sincronizar salud y participar en el grupo.
 3. En iPhone/iPad, mostrar tutorial visual Safari → Compartir → Agregar a
    pantalla de inicio. iOS no permite automatizar esos dos toques desde una web.
 4. Después de instalar, ofrecer un asistente separado para el puente de salud:
-   - iPhone: abrir Health Auto Export desde su enlace oficial y luego preparar
-     las automatizaciones privadas de la cuenta.
-   - Android: abrir Health Connect o sus ajustes según versión, abrir Health
-     Connect Webhook en Google Play y configurar endpoint/token.
+   - iPhone: instalar Conduit desde App Store y configurar endpoint/token.
+   - Android: abrir Health Connect o sus ajustes, instalar Life Dashboard
+     Companion 1.8.0 y configurar endpoint/token más `Daily totals`.
 5. Mostrar estado de cada etapa: PWA instalada, app puente disponible,
    automatización creada y última recepción confirmada.
 6. Nunca colocar tokens privados en enlaces públicos, documentación o analítica.

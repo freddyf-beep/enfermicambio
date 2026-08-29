@@ -52,18 +52,22 @@ salud ni contraseñas en este archivo.
 1. Abrir la URL en Safari e iniciar sesión.
 2. Entrar a **Nosotros → Instalar aplicación** y usar **Compartir → Agregar a
    inicio**.
-3. Entrar a **Nosotros → Importación de salud**, preparar Health Auto Export y
-   abrir los dos enlaces en el mismo iPhone.
-4. Ejecutar una exportación de uno o dos días y confirmar que la hora de la
-   última recepción cambia.
+3. Instalar Conduit Health Sync desde App Store.
+4. Entrar a **Nosotros → Salud del teléfono → iPhone**, generar el token y
+   copiar `Webhook URL` y `Bearer Token` en Conduit.
+5. Activar pasos, distancia, energía activa, ejercicio y entrenamientos; usar
+   `Test Connection` y confirmar HTTP 200.
+6. Sincronizar y confirmar que la hora de la última recepción cambia.
 
 ## Android
 
 1. Abrir la URL en Chrome e iniciar sesión.
 2. Usar **Instalar aplicación** o **Agregar a pantalla principal**.
-3. En **Importación de salud**, generar el token genérico y configurarlo como
-   `Authorization: Bearer TOKEN` en el exportador compatible con Health Connect.
-4. Enviar un día dos veces y confirmar que el total se reemplaza sin duplicarse.
+3. Descargar Life Dashboard Companion 1.8.0 desde su release oficial de GitHub.
+4. En **Salud del teléfono → Android**, generar el token y configurar el endpoint
+   y `Authorization: Bearer TOKEN`.
+5. Activar `Daily totals`, sincronizar un día dos veces y confirmar que los UUID
+   y agregados impiden duplicar el total.
 
 ## Puerta final
 

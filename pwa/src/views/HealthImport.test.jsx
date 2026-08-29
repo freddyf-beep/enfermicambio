@@ -13,6 +13,6 @@ it('explains the safe demo behavior when Supabase is not configured', async () =
   await act(async () => root.render(<HealthImport />))
   expect(document.body.textContent).toContain('Salud del teléfono')
   expect(document.body.textContent).toContain('Esta es la demostración')
-  expect(document.body.textContent).toContain('enlaces y tokens privados')
-  expect(document.body.textContent).toContain('Generar token e instalar Atajo')
+  expect(document.body.textContent).toContain('Conduit Health Sync')
+  expect(document.body.textContent).toContain('Generar y verificar token')
 })

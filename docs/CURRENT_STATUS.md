@@ -9,7 +9,8 @@ Este archivo es la referencia corta para saber qué está guardado en el reposit
 - La aplicación principal está en `pwa/`, con interfaz móvil instalable y navegación propia de app.
 - El rediseño actual, Modo Casa, entrenamientos, comida y calorías, feed, misiones, logros y experiencia de notificaciones están versionados.
 - Las animaciones e ilustraciones de ejercicios incluyen sus avisos de licencia y atribución.
-- La integración de salud distingue Apple/iOS y Android, con función de ingesta, migraciones y documentación de Atajos.
+- La misma pantalla de salud distingue iPhone y Android: Conduit Health Sync en iPhone y Life Dashboard Companion 1.8.0 en Android, ambos gratuitos y con tokens independientes.
+- Las RPC de tokens, la deduplicación por UUID y `ingest_health` v3 están desplegadas en Supabase; se comprobaron respuestas HTTP 200 para ambos formatos.
 - El cliente Flutter de la raíz se conserva como implementación heredada y respaldo; no se eliminó.
 - Las herramientas de captura de tutoriales y preparación de Android se conservan en `tools/tutorials/`.
 
@@ -27,11 +28,9 @@ Importante: este checkpoint confirma que el código y los recursos están preser
 
 | Pendiente | Por qué no se resuelve solo con código |
 | --- | --- |
-| Aplicar las migraciones nuevas y desplegar `ingest_health` en Supabase | Modifica el backend remoto. |
-| Configurar el enlace público del Atajo de iCloud en `VITE_IOS_HEALTH_SHORTCUT_URL` | Requiere publicar o elegir el Atajo definitivo. |
 | Confirmar que el secreto VAPID privado corresponde a la clave pública configurada | El secreto vive fuera del repositorio. |
 | Validar permisos y entrega real de notificaciones | Requiere navegador instalado o dispositivo físico. |
-| Probar instalación y sincronización en iPhone y Android | Se dejó deliberadamente fuera de este checkpoint. |
+| Probar Conduit y Life Dashboard con datos reales en iPhone y Android | Requiere los teléfonos físicos y permisos de Apple Salud/Health Connect. |
 
 ## Mapa del repositorio
 

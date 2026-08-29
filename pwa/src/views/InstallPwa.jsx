@@ -6,7 +6,8 @@ import { useStore } from '../store/useStore.js'
 import { INSTALL_ICONS } from '../lib/install-icon.js'
 
 const HEALTH_CONNECT = 'https://play.google.com/store/apps/details?id=com.google.android.apps.healthdata'
-const HEALTH_CONNECT_WEBHOOK = 'https://play.google.com/store/apps/details?id=com.hcwebhook.app'
+const CONDUIT_APP_STORE = 'https://apps.apple.com/cl/app/conduit-health-sync/id6786544769'
+const LIFE_DASHBOARD_APK = 'https://github.com/owen282000/life-dashboard-companion-app/releases/download/1.8.0/app-release.apk'
 
 const steps = {
   ios: [
@@ -58,12 +59,12 @@ export default function InstallPwa({ publicView = false }) {
     <section className="ec-bridge">
       <div className="ec-section-head"><div><p className="ec-kicker">Después de instalar</p><h2>Conecta la salud del teléfono</h2></div></div>
       {selected === 'ios' ? <>
-        <div className="ec-store-card"><span className="ios"><Icon name="activity" /></span><div><b>Atajos + Apple Salud</b><p>Usa la app Atajos incluida en el iPhone para enviar los datos que autorices.</p><small>Es la alternativa gratuita: no requiere prueba ni suscripción.</small></div><a href="shortcuts://" rel="noreferrer">Abrir Atajos</a></div>
-        <button className="ec-secondary" onClick={() => nav('/health-import')}>Configurar conexión gratuita</button>
+        <div className="ec-store-card"><span className="ios"><Icon name="activity" /></span><div><b>Conduit Health Sync</b><p>Conecta Apple Salud directamente con tu webhook privado.</p><small>Gratis, sin prueba, suscripción ni compras internas.</small></div><a href={CONDUIT_APP_STORE} target="_blank" rel="noreferrer">App Store</a></div>
+        <button className="ec-secondary" onClick={() => nav('/health-import')}>Generar y verificar token de iPhone</button>
       </> : <>
         <div className="ec-store-card"><span className="android"><Icon name="heart" /></span><div><b>Health Connect</b><p>En Android 14 o superior viene en Ajustes; en versiones anteriores se instala desde Google Play.</p></div><a href={HEALTH_CONNECT} target="_blank" rel="noreferrer">Abrir</a></div>
-        <div className="ec-store-card"><span className="android"><Icon name="refresh" /></span><div><b>Health Connect Webhook</b><p>Envía los datos directamente al webhook privado de EnfermiCambio.</p><small>Es una app de pago único; el precio depende de tu tienda.</small></div><a href={HEALTH_CONNECT_WEBHOOK} target="_blank" rel="noreferrer">Google Play</a></div>
-        <button className="ec-secondary" onClick={() => nav('/health-import')}>Generar mi endpoint y token</button>
+        <div className="ec-store-card"><span className="android"><Icon name="refresh" /></span><div><b>Life Dashboard Companion 1.8.0</b><p>Envía Health Connect directamente al webhook privado de EnfermiCambio.</p><small>APK gratuito y de código abierto; sin cuenta, nube ni versión de prueba.</small></div><a href={LIFE_DASHBOARD_APK} target="_blank" rel="noreferrer">Descargar APK</a></div>
+        <button className="ec-secondary" onClick={() => nav('/health-import')}>Generar y verificar token de Android</button>
       </>}
     </section>
     {message && <div className="ec-result" role="status">{message}</div>}
