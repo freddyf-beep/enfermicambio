@@ -1,8 +1,18 @@
 # Enfermicambio
 
+Roadmap activo de producto y rediseño móvil: [EnfermiCambio 3.0](docs/REDESIGN_ROADMAP_V2.md).
+
 A private fitness and social competition app for exactly four friends, running on two iPhones and two Android phones. Real-world movement and nutrition become the input to a private game: rankings, missions, streaks, trophies, achievements, seasons, and a shared activity feed.
 
-This repository currently contains the product specification and delivery plan. The app is complete only when the acceptance criteria in `SPECS.md` and the release gate in `ROADMAP.md` pass on all four devices.
+## Dirección actual: PWA primero
+
+La aplicación principal está migrando a [`pwa/`](pwa/): una aplicación web instalable que elimina la distribución diaria de APK e IPA. El cliente Flutter permanece en la raíz como implementación heredada y respaldo durante la transición; no es la vía de distribución prevista para los cuatro usuarios.
+
+URL oficial: **https://enfermicambio-98b5a.web.app**
+
+Supabase continúa como backend único. Apple Health se conecta mediante Health Auto Export y Android mediante un exportador de Health Connect compatible con webhooks. La lógica de entrenamiento proviene de OpenGym bajo AGPL y las ilustraciones de Workout Guide bajo CC BY-SA 4.0.
+
+Consulta [`docs/PWA_ROADMAP.md`](docs/PWA_ROADMAP.md) para el estado de entrega y [`docs/PWA_ARCHITECTURE.md`](docs/PWA_ARCHITECTURE.md) para los límites entre PWA, salud y backend.
 
 ## What the Finished Product Looks Like
 
@@ -67,7 +77,7 @@ The four profiles: avatar, season rank, today's steps, current streaks, workouts
 
 Leader-change events are rate-limited so the feed stays fun instead of noisy.
 
-## Architecture
+## Arquitectura heredada de Flutter
 
 ```text
 Flutter app (iOS + Android)

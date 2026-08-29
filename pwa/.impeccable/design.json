@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-11T00:00:00Z",
+  "title": "Design System: Enfermicambio",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Scoreboard Lime",
+        "canonical": "#C7FF00",
+        "tonalRamp": ["#263000", "#405000", "#5F7500", "#7F9E00", "#9FC600", "#C7FF00", "#DFFF75", "#F3FFC7"]
+      },
+      "secondary": {
+        "role": "secondary",
+        "displayName": "Heat Orange",
+        "canonical": "#FF5A26",
+        "tonalRamp": ["#3A1005", "#68200C", "#9A3212", "#C94419", "#E65320", "#FF5A26", "#FF9A78", "#FFD0C1"]
+      },
+      "neutral-background": {
+        "role": "neutral",
+        "displayName": "Night Canvas",
+        "canonical": "#111211",
+        "tonalRamp": ["#111211", "#171817", "#1C1D1C", "#242523", "#292A28", "#343632", "#A9ABA3", "#F4F5EE"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Score Display",
+        "purpose": "Screen titles and the single most important metric."
+      },
+      "label": {
+        "displayName": "Utility Label",
+        "purpose": "Short labels, freshness, badges, and compact controls."
+      }
+    },
+    "shadows": [
+      {
+        "name": "active-glow",
+        "value": "0 0 18px rgba(199,255,0,0.16)",
+        "purpose": "Selected tabs, live leader, and completed primary action."
+      },
+      {
+        "name": "warm-lift",
+        "value": "0 4px 16px rgba(0,0,0,0.18)",
+        "purpose": "Dialogs and bottom navigation only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-transition",
+        "value": "180ms ease-out",
+        "purpose": "Selection, permission, sync, and feedback state changes."
+      }
+    ],
+    "breakpoints": [
+      { "name": "phone-compact", "value": "360px" },
+      { "name": "phone-wide", "value": "430px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Use for the single clearest action on a screen.",
+      "html": "<button class=\"ds-btn-primary\">CONECTAR SALUD</button>",
+      "css": ".ds-btn-primary { background: #C7FF00; color: #111211; padding: 14px 20px; border: 0; border-radius: 12px; font-weight: 700; transition: background 180ms ease-out, transform 180ms ease-out; } .ds-btn-primary:hover { background: #8EBA00; } .ds-btn-primary:focus-visible { outline: 2px solid #F4F5EE; outline-offset: 2px; }"
+    },
+    {
+      "name": "Score Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Tonal container for a metric, ranking row, or permission state.",
+      "html": "<section class=\"ds-card\"><strong>HOY</strong><span>8,432 pasos</span></section>",
+      "css": ".ds-card { background: #1C1D1C; color: #F4F5EE; padding: 16px; border: 1px solid #343632; border-radius: 16px; }"
+    },
+    {
+      "name": "Selected Navigation",
+      "kind": "nav",
+      "refersTo": "nav-selected",
+      "description": "The active destination in the five-tab mobile navigation.",
+      "html": "<button class=\"ds-nav-selected\" aria-current=\"page\">HOY</button>",
+      "css": ".ds-nav-selected { background: #C7FF00; color: #111211; padding: 10px 14px; border: 0; border-radius: 999px; font-weight: 700; } .ds-nav-selected:focus-visible { outline: 2px solid #F4F5EE; outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Club Scoreboard",
+    "overview": "Enfermicambio should feel like opening the private scoreboard of a small, competitive sports club. It is dark, immediate, and a little cheeky, but it never sacrifices the trust needed for health data.",
+    "keyCharacteristics": [
+      "Dark-first, high-contrast mobile surfaces.",
+      "Acid-lime action and selection states.",
+      "Orange reserved for heat, calories, duels, and warnings.",
+      "Bold hierarchy with calm secondary copy.",
+      "Flat surfaces with state-based emphasis rather than permanent shadows."
+    ],
+    "rules": [
+      { "name": "Accent-Has-a-Job Rule", "body": "Lime and orange must communicate a state or action.", "section": "colors" },
+      { "name": "Number-First Rule", "body": "Numeric values use tabular figures, strong weight, and enough surrounding space to scan at a glance.", "section": "typography" },
+      { "name": "Flat-at-Rest Rule", "body": "A screen should still be legible if all shadows are removed.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do make today's competition the first meaningful visual on HOY.",
+      "Do use Scoreboard Lime for the selected tab, primary action, progress, and current leader.",
+      "Do pair every permission or sync error with a recovery action."
+    ],
+    "donts": [
+      "Don't make the interface look like a clinical or medical dashboard.",
+      "Don't use casino-like gamification, random rewards, virtual currency, or excessive animation.",
+      "Don't communicate rank, freshness, permission, or failure with color alone."
+    ]
+  }
+}

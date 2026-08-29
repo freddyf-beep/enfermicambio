@@ -48,6 +48,8 @@ Deno.serve(async (req: Request) => {
     `https://world.openfoodfacts.org/api/v3/product/${barcode}`,
   );
   endpoint.searchParams.set("fields", OPEN_FOOD_FACTS_FIELDS);
+  endpoint.searchParams.set("cc", "cl");
+  endpoint.searchParams.set("lc", "es");
 
   try {
     const upstream = await fetch(endpoint, {

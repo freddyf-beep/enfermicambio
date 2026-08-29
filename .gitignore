@@ -33,6 +33,13 @@ migrate_working_dir/
 /build/
 /coverage/
 /artifacts/
+/.firebase/
+/tools/tutorials/node_modules/
+
+# The imported PWA ZIP carried snapshots of Supabase and a nested workflow.
+# The repository-root versions are canonical; keep local snapshots untracked.
+/pwa/supabase/
+/pwa/.github/
 
 # Downloaded source references stay available locally. Only their catalog is
 # versioned so nested repositories and third-party histories are never bundled.

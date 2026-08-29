@@ -1,0 +1,33 @@
+{
+  "name": "enfermicambio-pwa",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:fatigue-probe": "node scripts/fatigue-monotonic-probe.mjs",
+    "shortcut:configure": "node scripts/configure-ios-shortcut.mjs"
+  },
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.4",
+    "@zxing/browser": "^0.2.1",
+    "@zxing/library": "^0.23.0",
+    "leaflet": "^1.9.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.18.2",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.3",
+    "happy-dom": "^20.11.2",
+    "linkedom": "^0.18.13",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
+  }
+}
