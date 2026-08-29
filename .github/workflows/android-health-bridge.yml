@@ -11,7 +11,7 @@ on:
 jobs:
   test-build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -30,6 +30,22 @@ jobs:
       - name: Build debug APK
         working-directory: android-health-bridge
         run: gradle assembleDebug --stacktrace
+      - name: Emulator smoke test API 35
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          script: |
+            adb install -r android-health-bridge/app/build/outputs/apk/debug/app-debug.apk
+            adb shell pm path com.enfermicambio.healthbridge
+            adb shell am start -W -n com.enfermicambio.healthbridge/.MainActivity | tee /tmp/healthbridge-launch.txt
+            grep -q "Status: ok" /tmp/healthbridge-launch.txt
+            adb shell am force-stop com.enfermicambio.healthbridge
+            adb shell am start -W -a android.intent.action.VIEW -d 'enfermicambio://health/pair?v=1&platform=android&endpoint=https%3A%2F%2Fbweynxdzovnbcjwgddar.supabase.co%2Ffunctions%2Fv1%2Fingest_health&token=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef&expires_at=2099-12-31T23%3A59%3A59Z' com.enfermicambio.healthbridge | tee /tmp/healthbridge-deeplink.txt
+            grep -q "Status: ok" /tmp/healthbridge-deeplink.txt
+            adb shell dumpsys package com.enfermicambio.healthbridge | grep -q "versionName=1.0.0"
       - name: SHA-256
         run: sha256sum android-health-bridge/app/build/outputs/apk/debug/app-debug.apk | tee android-health-bridge/app/build/outputs/apk/debug/SHA256.txt
       - uses: actions/upload-artifact@v4
