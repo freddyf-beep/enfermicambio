@@ -66,6 +66,9 @@ const valueOf = (source: Record<string, unknown>, ...keys: string[]) => {
   for (const key of keys) if (Object.prototype.hasOwnProperty.call(source, key)) return source[key]
   return undefined
 }
+const isConduitPayload = (payload: Record<string, unknown>) =>
+  valueOf(payload, 'schemaVersion', 'schema_version') === 'v1' &&
+  (Array.isArray(payload.batches) || valueOf(payload, 'batchId', 'batch_id') !== undefined)
 const cleanText = (value: unknown, fallback = '') => typeof value === 'string' && value.trim() ? value.trim() : fallback
 const cleanNumber = (value: unknown) => Math.max(0, Number(value) || 0)
 
@@ -312,7 +315,9 @@ export function inferHealthPlatform(payload: Record<string, unknown>): HealthPla
   if (payload.source_platform === 'ios' || payload.source_platform === 'android') return payload.source_platform
   if (payload.source === 'health_connect') return 'android'
   if (payload.source === 'healthkit_ios') return 'ios'
-  if (valueOf(payload, 'schemaVersion', 'schema_version') === 'v1' && Array.isArray(payload.batches)) return 'ios'
+  // SwiftProtobuf omits empty repeated fields, so Conduit's Test Connection
+  // envelope has a batchId but no `batches` property at all.
+  if (isConduitPayload(payload)) return 'ios'
   return null
 }
 
@@ -320,6 +325,6 @@ export function normalizeHealthPayload(payloadValue: unknown): NormalizedHealthP
   const payload = record(payloadValue)
   if (!payload) throw new Error('Payload must be a JSON object')
   if (payload.source === 'health_connect' || payload.source === 'healthkit_ios') return lifeDashboardPayload(payload)
-  if (valueOf(payload, 'schemaVersion', 'schema_version') === 'v1' && Array.isArray(payload.batches)) return conduitPayload(payload)
+  if (isConduitPayload(payload)) return conduitPayload(payload)
   return directPayload(payload)
 }

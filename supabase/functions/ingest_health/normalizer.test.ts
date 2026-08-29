@@ -39,9 +39,15 @@ test('prefers deduplicated Android daily totals and maps exercise UUIDs', () => 
   assert.equal(normalized.workouts[0].workoutType, 'running')
 })
 
-test('accepts an empty Conduit Test Connection envelope', () => {
-  const normalized = normalizeHealthPayload({ schemaVersion: 'v1', batchId: 'test-1', batches: [] })
+test('accepts the exact Conduit Test Connection envelope when SwiftProtobuf omits empty batches', () => {
+  const normalized = normalizeHealthPayload({
+    schemaVersion: 'v1',
+    batchId: 'test-1',
+    deviceId: 'iphone-test',
+    sentAtUnixMs: '1788012000000',
+  })
   assert.equal(normalized.platform, 'ios')
+  assert.equal(normalized.requestId, 'test-1')
   assert.equal(normalized.samples.length, 0)
   assert.equal(normalized.workouts.length, 0)
 })
