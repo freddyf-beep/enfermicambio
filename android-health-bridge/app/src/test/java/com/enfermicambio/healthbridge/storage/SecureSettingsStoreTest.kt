@@ -28,7 +28,7 @@ class SecureSettingsStoreTest {
     @Test fun encryptedPersistenceAndDisconnectCleanup() {
         val cipher = FakeCipher()
         val store = SecureSettingsStore(context, cipher, prefs)
-        val token = "b".repeat(64)
+        val token = "0123456789abcdef".repeat(4)
         store.savePairing(PairingPayload(PairingParser.PRODUCTION_ENDPOINT, token))
         assertFalse(store.encryptedTokenForTestOnly().orEmpty().contains(token))
         assertEquals(token, store.loadPairing()?.token)
